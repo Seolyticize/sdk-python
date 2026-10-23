@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seolyticize"
+version = "0.1.0"
+description = "Seolyticize for Python: every API tool as a method, and on-site helpers for analytics, IndexNow and deploys."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+dependencies = []
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Internet :: WWW/HTTP :: Site Management",
+]
+
+[project.urls]
+Homepage = "https://seolyticize.com"
+Documentation = "https://seolyticize.com/docs/python-sdk"
+Source = "https://github.com/Seolyticize/sdk-python"
+
+[tool.setuptools.packages.find]
+where = ["src"]
