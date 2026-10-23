@@ -14,7 +14,7 @@ from ._tools import READ_ONLY_TOOLS, Tools
 from .errors import NetworkError, RateLimitError, SeolyticizeError, error_for_status
 
 DEFAULT_BASE_URL = "https://seolyticize.com"
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 
 class Seolyticize(Tools):

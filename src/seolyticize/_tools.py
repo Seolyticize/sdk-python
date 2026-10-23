@@ -8,22 +8,28 @@ READ_ONLY_TOOLS = frozenset({
     "analyse_server_log",
     "batch_domain_metrics",
     "build_disavow_file",
+    "compare_crawls",
+    "describe_datasets",
     "estimate_ai_visibility_cost",
     "estimate_cost",
     "explain_keyword_difficulty",
     "export_ai_visibility_data",
+    "export_data",
     "export_search_console_data",
     "get_agent_readiness",
+    "get_ai_overview_citations",
     "get_ai_visibility",
     "get_ai_visibility_answer",
     "get_ai_visibility_results",
     "get_ai_visibility_runs",
     "get_ai_visibility_setup",
     "get_ai_visibility_trend",
+    "get_anchor_overlap",
     "get_audit_summary",
     "get_backlink_audit",
     "get_billing",
     "get_bing_performance",
+    "get_brand_split",
     "get_branding",
     "get_cannibalization",
     "get_click_curve",
@@ -31,15 +37,21 @@ READ_ONLY_TOOLS = frozenset({
     "get_client_brief",
     "get_client_costs",
     "get_client_integrations",
+    "get_competitor_new_pages",
+    "get_competitor_page_changes",
     "get_connection_link",
     "get_content_decay",
     "get_content_gap",
+    "get_content_groups",
+    "get_conversions",
     "get_costs",
+    "get_crawl_settings",
     "get_crawl_status",
     "get_deploy_hook",
     "get_domain_facts",
     "get_domain_technologies",
     "get_entity_pageviews",
+    "get_extraction_results",
     "get_ga4_audience",
     "get_ga4_ecommerce",
     "get_ga4_key_events",
@@ -52,6 +64,8 @@ READ_ONLY_TOOLS = frozenset({
     "get_google_service_account",
     "get_index_coverage",
     "get_indexnow_key",
+    "get_internal_link_graph",
+    "get_issue_templates",
     "get_keyword_difficulty",
     "get_keyword_gap",
     "get_keyword_list",
@@ -61,16 +75,24 @@ READ_ONLY_TOOLS = frozenset({
     "get_low_ctr_queries",
     "get_next_steps",
     "get_opportunities",
+    "get_page_details",
     "get_page_issues",
     "get_panel_reach",
+    "get_parameter_report",
     "get_position_distribution",
+    "get_query_page_swaps",
     "get_rank_history",
     "get_rank_summary",
+    "get_rendering_report",
     "get_run_status",
+    "get_search_appearance",
+    "get_search_changes",
     "get_search_console_performance",
     "get_search_demand",
     "get_search_opportunities",
+    "get_search_timeline",
     "get_serp_features",
+    "get_serp_volatility",
     "get_share_of_voice",
     "get_site_status",
     "get_top_searches",
@@ -81,7 +103,9 @@ READ_ONLY_TOOLS = frozenset({
     "get_written_report",
     "get_yandex_performance",
     "list_alert_rules",
+    "list_annotations",
     "list_clients",
+    "list_conversion_goals",
     "list_crawl_issues",
     "list_crawls",
     "list_issue_pages",
@@ -99,11 +123,13 @@ READ_ONLY_TOOLS = frozenset({
     "list_tracked_keywords",
     "list_written_reports",
     "page_vitals",
+    "query_data",
     "striking_distance",
+    "suggest_internal_links",
     "whoami",
 })
 
-TOOL_COUNT = 199
+TOOL_COUNT = 239
 
 
 def _present(values: Dict[str, Any]) -> Dict[str, Any]:
@@ -116,6 +142,14 @@ class Tools:
 
     def call(self, tool: str, input: Optional[Dict[str, Any]] = None) -> Any:  # pragma: no cover
         raise NotImplementedError
+
+    def add_annotation(self, *, client_id: str, on: str, kind: Literal["deploy", "publish", "content_update", "campaign", "technical", "note"], title: str, detail: Optional[str] = None, url: Optional[str] = None) -> Any:
+        """Note something on the client's timeline. Records something that happened on a
+        day — a deploy, a page published or rewritten, a campaign, a technical change, a
+        note — so traffic charts and get_search_timeline can be read as cause and
+        effect. Answers 'remember that we shipped this today'. Deploy hooks note their
+        runs on their own. Free."""
+        return self.call("add_annotation", _present({"clientId": client_id, "on": on, "kind": kind, "title": title, "detail": detail, "url": url}))
 
     def add_competitors(self, *, client_id: str, tracker_id: str, domains: List[str]) -> Any:
         """Add competitors to a tracker. Adds competitor domains to a rank tracker, so
@@ -202,6 +236,19 @@ class Tools:
         competitors and prospects."""
         return self.call("batch_domain_metrics", _present({"domains": domains}))
 
+    def build_content_brief(self, *, client_id: str, keyword: str, related_keywords: Optional[List[str]] = None, target_url: Optional[str] = None, depth: Optional[int] = None, save: Optional[bool] = None, location_code: Optional[int] = None, language_code: Optional[str] = None, max_cost_micros: Optional[int] = None) -> Any:
+        """Build a content brief. A writer's brief for a keyword (or a cluster: the keyword
+        plus relatedKeywords), built from the pages that rank: search intent and the
+        format that wins (list, how-to, comparison, review, landing page, article),
+        target length, the outline to cover, must-cover and nice-to-have terms,
+        questions to answer (People Also Ask and the ranking pages'), structure and
+        schema to include, the client's own pages to link to and from, and each
+        competing page with what it misses. Answers 'brief me on this keyword' and 'what
+        should this post cover'. save: true keeps it as a research note on the client
+        brief. Same cost as get_serp_content_profile. Can spend: pass max_cost_micros to
+        cap it."""
+        return self.call("build_content_brief", _present({"clientId": client_id, "keyword": keyword, "relatedKeywords": related_keywords, "targetUrl": target_url, "depth": depth, "save": save, "locationCode": location_code, "languageCode": language_code, "maxCostMicros": max_cost_micros}))
+
     def build_disavow_file(self, *, entries: List[Dict[str, Any]]) -> Any:
         """Build a disavow file. Builds a Google disavow file from domains and URLs: a
         domain entry disavows every link from that domain, a url entry names one page.
@@ -211,6 +258,26 @@ class Tools:
         every line first: disavowing a good link removes value the client earned.
         Malformed entries are left out rather than written."""
         return self.call("build_disavow_file", _present({"entries": entries}))
+
+    def cluster_keywords(self, *, client_id: str, keywords: Optional[List[str]] = None, list_id: Optional[str] = None, min_shared: Optional[int] = None, depth: Optional[int] = None, mode: Optional[Literal["head", "connected"]] = None, location_code: Optional[int] = None, language_code: Optional[str] = None, max_cost_micros: Optional[int] = None) -> Any:
+        """Group keywords into topics. Groups keywords into topics by how much their Google
+        results overlap: keywords whose top results share at least minShared pages are
+        one topic, which one page should target. Each topic has its parent topic (the
+        highest-volume keyword), total volume, intent, the pages that rank across it,
+        and where the client already ranks. Answers 'which of these keywords belong on
+        one page' and 'how many pages do we need'. Give keywords (up to 200) or a
+        keyword listId. One results page per keyword, each a paid lookup on the client's
+        account unless someone bought it in the last day — quote with estimate_cost
+        first. Can spend: pass max_cost_micros to cap it."""
+        return self.call("cluster_keywords", _present({"clientId": client_id, "keywords": keywords, "listId": list_id, "minShared": min_shared, "depth": depth, "mode": mode, "locationCode": location_code, "languageCode": language_code, "maxCostMicros": max_cost_micros}))
+
+    def compare_crawls(self, *, client_id: str, crawl_id: Optional[str] = None, against_crawl_id: Optional[str] = None, sample: Optional[int] = None) -> Any:
+        """What changed since the last crawl. Compares a crawl's issues with the crawl
+        before it (or againstCrawlId), page by page: issues that are new, issues that
+        were fixed, and rules that got worse or better, with sample pages — plus pages
+        added, removed and changed. Answers 'did the fixes work', 'what broke this week'
+        and 'what should the weekly audit report'. Free."""
+        return self.call("compare_crawls", _present({"clientId": client_id, "crawlId": crawl_id, "againstCrawlId": against_crawl_id, "sample": sample}))
 
     def connect_google_analytics_service_account(self, *, client_id: str, property_id: str) -> Any:
         """Connect GA4 by service account. Connects a client's GA4 property as the agency's
@@ -374,6 +441,13 @@ class Tools:
         reports, templates or anything else. Free."""
         return self.call("delete_written_report", _present({"clientId": client_id, "reportId": report_id}))
 
+    def describe_datasets(self) -> Any:
+        """What can be queried. The datasets query_data and export_data read — Search
+        Console (every day kept), cookieless analytics events, crawl pages, issues and
+        links, rank captures, backlinks — with their columns, metrics and time column.
+        Answers 'what data is there to ask about'. Free."""
+        return self.call("describe_datasets", {})
+
     def disconnect_app(self, *, grant_id: str) -> Any:
         """Disconnect an app. Stops a signed-in app working, at once: its access and
         refresh tokens both end. Answers 'remove that assistant's access'. Takes the
@@ -451,6 +525,13 @@ class Tools:
         rows and csv. Answers 'give me the raw data for a deck'. Free."""
         return self.call("export_ai_visibility_data", _present({"clientId": client_id, "days": days, "include": include}))
 
+    def export_data(self, *, client_id: str, dataset: Literal["gsc", "web_events", "crawl_pages", "crawl_issues", "crawl_links", "rank_captures", "backlinks"], dimensions: Optional[List[str]] = None, metrics: Optional[List[str]] = None, columns: Optional[List[str]] = None, filters: Optional[List[Dict[str, Any]]] = None, from_: Optional[str] = None, to: Optional[str] = None, order_by: Optional[List[Dict[str, Any]]] = None, crawl_id: Optional[str] = None, limit: Optional[int] = None, format_: Optional[Literal["csv", "jsonl", "parquet"]] = None) -> Any:
+        """Export stored data to a file. The same query as query_data, written to a file —
+        CSV, JSON lines or Parquet, up to a million rows — with a download link valid
+        for 24 hours, for BigQuery, a notebook or a spreadsheet. Answers 'give me all of
+        our Search Console history' and 'export the crawl'. Free."""
+        return self.call("export_data", _present({"clientId": client_id, "dataset": dataset, "dimensions": dimensions, "metrics": metrics, "columns": columns, "filters": filters, "from": from_, "to": to, "orderBy": order_by, "crawlId": crawl_id, "limit": limit, "format": format_}))
+
     def export_search_console_data(self, *, client_id: str, from_: str, to: str, search_type: Optional[Literal["web", "image", "video", "news", "discover", "googleNews"]] = None, country: Optional[str] = None, device: Optional[Literal["DESKTOP", "MOBILE", "TABLET"]] = None, dimension: Optional[Literal["query", "page"]] = None) -> Any:
         """Export Search Console queries or pages as CSV. Google Search Console queries or
         pages (dimension) for a search type, date range, and optionally one country and
@@ -474,6 +555,15 @@ class Tools:
         assistants — crawler access, rendering, structured data. Answers 'why are
         assistants not citing us'."""
         return self.call("get_agent_readiness", _present({"clientId": client_id}))
+
+    def get_ai_overview_citations(self, *, client_id: str, tracker_id: Optional[str] = None, feature: Optional[Literal["ai_overview", "featured_snippet", "people_also_ask"]] = None, days: Optional[int] = None) -> Any:
+        """Who the AI Overview cites. For each tracked keyword: how often Google showed an
+        AI Overview (or a featured snippet, or People Also Ask — feature), whether the
+        client is cited, who is, and how that changed; plus the domains cited most
+        across the keywords — the outreach and content targets. Answers 'are we in the
+        AI Overview' and 'who does Google trust on this topic'. From the results pages
+        already captured; free."""
+        return self.call("get_ai_overview_citations", _present({"clientId": client_id, "trackerId": tracker_id, "feature": feature, "days": days}))
 
     def get_ai_visibility(self, *, client_id: str) -> Any:
         """Get AI assistant visibility. How often the client's brand appears in AI
@@ -519,6 +609,24 @@ class Tools:
         recommended more than last month'. Free."""
         return self.call("get_ai_visibility_trend", _present({"clientId": client_id, "days": days}))
 
+    def get_anchor_distribution(self, *, client_id: str, domain: Optional[str] = None, source: Optional[Literal["auto", "vendor", "index"]] = None, limit: Optional[int] = None, max_cost_micros: Optional[int] = None) -> Any:
+        """Anchor text mix. The anchor texts a domain is linked with, each classed as
+        branded, a bare URL, generic (click here, read more), empty (images) or other
+        (usually keyword-rich), and the mix by referring domains. Answers 'does our link
+        profile look natural' and 'what do they rank with'. source vendor (and auto,
+        when a provider is connected) is a paid lookup on the client's account unless
+        anyone bought it in the last week; index is free. Can spend: pass
+        max_cost_micros to cap it."""
+        return self.call("get_anchor_distribution", _present({"clientId": client_id, "domain": domain, "source": source, "limit": limit, "maxCostMicros": max_cost_micros}))
+
+    def get_anchor_overlap(self, *, client_id: str, crawl_id: Optional[str] = None, limit: Optional[int] = None) -> Any:
+        """One anchor, several pages. Descriptive anchor texts used for links to more than
+        one page — the site telling search engines that two pages are about the same
+        words, which splits their ranking (cannibalization through links). Generic
+        anchors (read more, click here) are left out. Answers 'are our internal links
+        confusing Google'. Free."""
+        return self.call("get_anchor_overlap", _present({"clientId": client_id, "crawlId": crawl_id, "limit": limit}))
+
     def get_audit_summary(self, *, client_id: str, crawl_id: Optional[str] = None) -> Any:
         """Get site audit summary. Technical issues one crawl found, grouped by rule: each
         with its name, severity, category, how many pages it affects and howToFix.
@@ -547,6 +655,24 @@ class Tools:
         does the vendor think of these links'. Can spend: pass max_cost_micros to cap
         it."""
         return self.call("get_backlink_spam_scores", _present({"clientId": client_id, "domains": domains, "maxCostMicros": max_cost_micros}))
+
+    def get_backlinks(self, *, client_id: str, domain: Optional[str] = None, source: Optional[Literal["auto", "vendor", "index"]] = None, limit: Optional[int] = None, mode: Optional[Literal["all", "new", "lost"]] = None, days: Optional[int] = None, max_cost_micros: Optional[int] = None) -> Any:
+        """Backlinks, new and lost. The links to a domain, page to page, with anchor and
+        follow status; mode new lists links first seen in the last days, lost those no
+        longer seen since. Answers 'which links did we gain or lose this month' and
+        'what links does this competitor have'. source vendor (and auto, when a provider
+        is connected) is a paid lookup on the client's account unless anyone bought it
+        in the last week; index is free. Can spend: pass max_cost_micros to cap it."""
+        return self.call("get_backlinks", _present({"clientId": client_id, "domain": domain, "source": source, "limit": limit, "mode": mode, "days": days, "maxCostMicros": max_cost_micros}))
+
+    def get_best_pages_by_links(self, *, client_id: str, domain: Optional[str] = None, source: Optional[Literal["auto", "vendor", "index"]] = None, limit: Optional[int] = None, max_cost_micros: Optional[int] = None) -> Any:
+        """Pages that attract links. A domain's pages by how many domains link to them. Run
+        it on competitors to see what kind of content earns links in a niche — the
+        content worth making. Answers 'what do people link to'. source vendor (and auto,
+        when a provider is connected) is a paid lookup on the client's account unless
+        anyone bought it in the last week; index is free. Can spend: pass
+        max_cost_micros to cap it."""
+        return self.call("get_best_pages_by_links", _present({"clientId": client_id, "domain": domain, "source": source, "limit": limit, "maxCostMicros": max_cost_micros}))
 
     def get_billing(self) -> Any:
         """Read the agency's plan. The agency's plan, its limits, how many clients it uses,
@@ -582,11 +708,30 @@ class Tools:
         estimate_cost. Can spend: pass max_cost_micros to cap it."""
         return self.call("get_brand_mentions", _present({"clientId": client_id, "keyword": keyword, "maxCostMicros": max_cost_micros}))
 
+    def get_brand_split(self, *, client_id: str, from_: Optional[str] = None, to: Optional[str] = None, interval: Optional[Literal["day", "week", "month"]] = None, country: Optional[str] = None) -> Any:
+        """Branded vs non-branded search. Google search clicks and impressions split into
+        branded (the query names the client) and non-branded, by day, week or month,
+        with the property total and the anonymised remainder Google withholds queries
+        for. Answers 'is non-branded traffic growing' — the number content and SEO work
+        actually move. Brand terms come from the client brief (update_client_brief
+        brandTerms), or the client's name and domain. Free."""
+        return self.call("get_brand_split", _present({"clientId": client_id, "from": from_, "to": to, "interval": interval, "country": country}))
+
     def get_branding(self) -> Any:
         """Read the agency's branding. The agency's name, logo address and primary colour:
         what clients see on reports and portal links. Answers 'what will this report
         look like to the client'. Empty strings where nothing is set."""
         return self.call("get_branding", {})
+
+    def get_broken_backlinks(self, *, client_id: str, source: Optional[Literal["auto", "vendor", "index"]] = None, limit: Optional[int] = None, max_cost_micros: Optional[int] = None) -> Any:
+        """Links to broken pages. Links from other sites to the client's pages that no
+        longer work (4xx, or not answering), grouped by page, with the closest live page
+        to redirect each to — links already earned, reclaimed with one redirect. Answers
+        'which links are we wasting'. Status comes from the latest crawl, and pages it
+        did not crawl are checked. source vendor (and auto, when a provider is
+        connected) is a paid lookup on the client's account unless anyone bought it in
+        the last week; index is free. Can spend: pass max_cost_micros to cap it."""
+        return self.call("get_broken_backlinks", _present({"clientId": client_id, "source": source, "limit": limit, "maxCostMicros": max_cost_micros}))
 
     def get_cannibalization(self, *, client_id: str) -> Any:
         """Get cannibalization. Keywords where several of the client's own pages compete in
@@ -630,6 +775,21 @@ class Tools:
         for this client'. Never returns tokens."""
         return self.call("get_client_integrations", _present({"clientId": client_id}))
 
+    def get_competitor_new_pages(self, *, client_id: str, days: Optional[int] = None, competitors: Optional[List[str]] = None, limit: Optional[int] = None) -> Any:
+        """What competitors published. New and updated pages on competitors' sites, from
+        their sitemaps (read daily for every competitor a tracker watches, and read now
+        for any not yet watched), grouped by section — 'competitor X published 14 pages
+        under /guides this week'. Answers 'what are they writing about' and 'what did
+        they just launch'. competitors overrides the tracked ones. Free."""
+        return self.call("get_competitor_new_pages", _present({"clientId": client_id, "days": days, "competitors": competitors, "limit": limit}))
+
+    def get_competitor_page_changes(self, *, client_id: str, tracker_id: Optional[str] = None, days: Optional[int] = None) -> Any:
+        """Changes to pages that outrank us. Pages that rank above the client for its
+        tracked keywords whose title, H1, length or sections changed — read from
+        snapshots taken every few days. Answers 'what did the page that beat us change'.
+        Free."""
+        return self.call("get_competitor_page_changes", _present({"clientId": client_id, "trackerId": tracker_id, "days": days}))
+
     def get_connection_link(self, *, client_id: str, service: Literal["search_console", "search_console_sitemaps", "google_analytics", "yandex_webmaster", "google_business_profile"], property_url: Optional[str] = None, ga4_property_id: Optional[str] = None, location_id: Optional[str] = None) -> Any:
         """Get a link for a person to connect a service. The link a PERSON must open to
         connect one of a client's accounts — Google Search Console (search_console),
@@ -658,16 +818,53 @@ class Tools:
         keyword gap when planning content."""
         return self.call("get_content_gap", _present({"clientId": client_id, "competitorDomains": competitor_domains}))
 
+    def get_content_groups(self, *, client_id: str, days: Optional[int] = None, compare: Optional[Literal["previous", "year"]] = None, groups: Optional[List[Dict[str, Any]]] = None, country: Optional[str] = None, device: Optional[Literal["DESKTOP", "MOBILE", "TABLET"]] = None) -> Any:
+        """Search traffic by section. Google search clicks, impressions and position rolled
+        up by section of the site, two periods compared. Answers 'how is the blog doing
+        against the guides' and 'which template is losing traffic'. groups are matched
+        in order against each page's path, first match wins (* matches anything, so
+        '/blog/*'); without groups, pages are grouped by their first path segment. Free."""
+        return self.call("get_content_groups", _present({"clientId": client_id, "days": days, "compare": compare, "groups": groups, "country": country, "device": device}))
+
+    def get_conversions(self, *, client_id: str, source: Optional[Literal["web_analytics", "ga4"]] = None, by: Optional[Literal["landing_page", "source", "referrer"]] = None, channel: Optional[Literal["all", "search", "ai"]] = None, goals: Optional[List[str]] = None, days: Optional[int] = None, limit: Optional[int] = None) -> Any:
+        """Conversions by landing page and source. Conversions (sign-ups, purchases, any
+        goal) by the page a visit landed on, its source or its referrer, with visits,
+        converting visits, conversion rate and value — and, by landing page, the Search
+        Console queries that bring those visits. Answers 'which pages and queries
+        actually make money' and 'what is organic search worth'. source web_analytics
+        uses the cookieless analytics' custom events (goals: the event names; default
+        every event; value from a 'value' property); ga4 uses GA4's key events on
+        organic sessions. channel narrows to search engines or AI assistants. Free."""
+        return self.call("get_conversions", _present({"clientId": client_id, "source": source, "by": by, "channel": channel, "goals": goals, "days": days, "limit": limit}))
+
     def get_costs(self, *, since_days: Optional[int] = None) -> Any:
         """Vendor spend by client. What the agency spent on data vendors per client over
         recent days, with request counts. Answers 'which clients cost us the most'.
         Amounts are US dollars."""
         return self.call("get_costs", _present({"sinceDays": since_days}))
 
+    def get_crawl_settings(self, *, client_id: str) -> Any:
+        """How the site is crawled. The client's crawl settings: query parameters stripped
+        from discovered URLs, custom extraction rules, and JavaScript rendering (off,
+        shells — only pages that look unrendered — or all, up to renderMaxPages a
+        crawl). Answers 'what does the crawl do differently for this site'. Free."""
+        return self.call("get_crawl_settings", _present({"clientId": client_id}))
+
     def get_crawl_status(self, *, client_id: str, crawl_id: str) -> Any:
         """Get crawl status. Whether one crawl is running, complete or failed, with page
         and issue counts and the failure reason. Answers 'has the audit finished'."""
         return self.call("get_crawl_status", _present({"clientId": client_id, "crawlId": crawl_id}))
+
+    def get_demand_matrix(self, *, client_id: str, pattern: str, slots: Dict[str, Any], location_code: Optional[int] = None, language_code: Optional[str] = None, min_volume: Optional[int] = None, max_cost_micros: Optional[int] = None) -> Any:
+        """Demand for every combination. Search volume, difficulty and CPC for every
+        combination of a pattern's slots — 'receive sms {service} {country}' with
+        services and countries — up to 500, with the client's ranking page and position
+        for each from Search Console and a verdict: write (demand, no page), improve (a
+        page beyond the top ten), have (top ten) or skip (no demand). Answers 'which of
+        these template pages deserve to exist'. Volumes any agency bought before are
+        reused free; the rest is a paid keyword lookup on the client's account, in
+        batches. Can spend: pass max_cost_micros to cap it."""
+        return self.call("get_demand_matrix", _present({"clientId": client_id, "pattern": pattern, "slots": slots, "locationCode": location_code, "languageCode": language_code, "minVolume": min_volume, "maxCostMicros": max_cost_micros}))
 
     def get_deploy_hook(self, *, client_id: str) -> Any:
         """Get the deploy hook's status. Answers 'did the last deploy notify search
@@ -701,6 +898,13 @@ class Tools:
         which is the case for most small brands — and says which article it counted,
         because the closest article is not always the brand's own."""
         return self.call("get_entity_pageviews", _present({"entity": entity, "language": language, "granularity": granularity, "from": from_, "to": to}))
+
+    def get_extraction_results(self, *, client_id: str, crawl_id: Optional[str] = None, name: Optional[str] = None, limit: Optional[int] = None, offset: Optional[int] = None) -> Any:
+        """Custom extraction results. The values custom extraction (set_crawl_settings
+        extractions) read off each page in a crawl, page by page; name narrows to one
+        rule. Answers 'which pages have no author', 'what price does each product page
+        show' and 'which posts are older than X'. Free."""
+        return self.call("get_extraction_results", _present({"clientId": client_id, "crawlId": crawl_id, "name": name, "limit": limit, "offset": offset}))
 
     def get_ga4_audience(self, *, client_id: str, from_: Optional[str] = None, to: Optional[str] = None, compare: Optional[bool] = None, limit: Optional[int] = None, by: Optional[Literal["device", "country", "newVsReturning"]] = None, channel: Optional[Literal["organic", "all"]] = None) -> Any:
         """Who arrives (GA4). Users, sessions, engaged sessions and key events by device,
@@ -823,6 +1027,24 @@ class Tools:
         issue_indexnow_key."""
         return self.call("get_indexnow_key", _present({"clientId": client_id}))
 
+    def get_internal_link_graph(self, *, client_id: str, crawl_id: Optional[str] = None, sort: Optional[Literal["pagerank", "inlinks", "depth"]] = None, limit: Optional[int] = None, offset: Optional[int] = None) -> Any:
+        """The internal link graph. Every crawled page with its internal inlinks and
+        outlinks, clicks from the home page, internal PageRank (0–100), and the anchors
+        it is linked with — plus orphans (indexable pages nothing links to), pages
+        unreachable from the home page, and pages more than three clicks deep. Links
+        that redirect are followed to the page they land on; nofollow links do not
+        count. Answers 'which pages are buried', 'what holds our internal authority' and
+        'which pages are orphaned'. Free."""
+        return self.call("get_internal_link_graph", _present({"clientId": client_id, "crawlId": crawl_id, "sort": sort, "limit": limit, "offset": offset}))
+
+    def get_issue_templates(self, *, client_id: str, crawl_id: Optional[str] = None, rule_id: Optional[str] = None) -> Any:
+        """Issues by template. Groups each issue's pages by URL template (ids, slugs with
+        numbers and query values replaced by *), so '62 pages of
+        /community/es/u/*?sort=*' reads as one fix on one template. Answers 'how many
+        fixes is this really' and 'which template causes this'. ruleId narrows to one
+        issue. Free."""
+        return self.call("get_issue_templates", _present({"clientId": client_id, "crawlId": crawl_id, "ruleId": rule_id}))
+
     def get_keyword_difficulty(self, *, client_id: str, keyword_ids: List[str]) -> Any:
         """Get keyword difficulty. How hard the first page looks for given keywords, scored
         from how many domains link to the pages already ranking there. Answers 'is this
@@ -909,6 +1131,15 @@ class Tools:
         detail. Free."""
         return self.call("get_opportunities", _present({"clientId": client_id, "limit": limit}))
 
+    def get_page_details(self, *, client_id: str, url: str, crawl_id: Optional[str] = None) -> Any:
+        """Everything the crawl read on a page. One crawled page in full: its H2/H3
+        outline, word count, published and modified dates, structured data as written,
+        custom extraction values, the addresses that redirect to it, what JavaScript
+        changed when it was rendered, and its place in the link graph (inlinks,
+        outlinks, click depth, internal PageRank, anchors). Answers 'what does the
+        crawler see on this page'. Use get_page_issues for its issues. Free."""
+        return self.call("get_page_details", _present({"clientId": client_id, "crawlId": crawl_id, "url": url}))
+
     def get_page_issues(self, *, client_id: str, url: str, crawl_id: Optional[str] = None) -> Any:
         """Get every issue on one page. Lists every issue a crawl found on one page, with
         severity, message and howToFix. Answers 'what is wrong with this page' and,
@@ -923,6 +1154,14 @@ class Tools:
         rather than quietly wrong."""
         return self.call("get_panel_reach", _present({"hosts": hosts, "from": from_, "to": to}))
 
+    def get_parameter_report(self, *, client_id: str, crawl_id: Optional[str] = None) -> Any:
+        """URL parameters and crawl waste. Every query parameter the crawl met — sort
+        orders, filters, tracking, pagination — with how many pages carry it, how many
+        of those are canonicalised to another page (crawl waste), their issues, and
+        whether to strip it from crawls (set_crawl_settings stripParams), keep it, or
+        review it. Answers 'why is the crawl full of ?sort= pages'. Free."""
+        return self.call("get_parameter_report", _present({"clientId": client_id, "crawlId": crawl_id}))
+
     def get_position_distribution(self, *, client_id: str, tracker_id: str, days: Optional[int] = None, device: Optional[Literal["desktop", "mobile"]] = None) -> Any:
         """Get position distribution. How a tracker's keywords spread across positions 1-3,
         4-10, 11-20, 21-50 and 51-100 each day, with average position and visibility,
@@ -931,6 +1170,15 @@ class Tools:
         keywords not read that day are counted as not captured. The average is over
         ranking keywords only."""
         return self.call("get_position_distribution", _present({"clientId": client_id, "trackerId": tracker_id, "days": days, "device": device}))
+
+    def get_query_page_swaps(self, *, client_id: str, days: Optional[int] = None, compare: Optional[Literal["previous", "year"]] = None, brand: Optional[Literal["all", "branded", "non_branded"]] = None, min_impressions: Optional[int] = None, limit: Optional[int] = None) -> Any:
+        """Queries answered by a different page. Queries where Google now sends searchers
+        to a different page of the site than in the previous period, with both pages and
+        their clicks. Answers 'is Google confused about which page to rank' — a swap is
+        usually two pages competing (merge them or fix internal links) or a new page
+        taking over. Every Search Console query, not only tracked keywords
+        (get_url_swaps covers those). Free."""
+        return self.call("get_query_page_swaps", _present({"clientId": client_id, "days": days, "compare": compare, "brand": brand, "minImpressions": min_impressions, "limit": limit}))
 
     def get_rank_history(self, *, client_id: str, tracker_id: str, keyword_ids: Optional[List[str]] = None, days: Optional[int] = None, device: Optional[Literal["desktop", "mobile"]] = None) -> Any:
         """Get rank history. Day-by-day positions for a tracker's keywords, each day with
@@ -946,6 +1194,25 @@ class Tools:
         client, with the average position. Answers 'are rankings getting better'."""
         return self.call("get_rank_summary", _present({"clientId": client_id, "trackerId": tracker_id}))
 
+    def get_referring_domains(self, *, client_id: str, domain: Optional[str] = None, source: Optional[Literal["auto", "vendor", "index"]] = None, limit: Optional[int] = None, max_cost_micros: Optional[int] = None) -> Any:
+        """Referring domains. The domains linking to a domain (the client's or any
+        competitor's), with how many links each sends, whether they follow, the linking
+        domain's authority (0–100) and when the links were first and last seen. Answers
+        'who links to us', 'who links to them' and 'which sites are worth asking'.
+        source vendor (and auto, when a provider is connected) is a paid lookup on the
+        client's account unless anyone bought it in the last week; index is free. Can
+        spend: pass max_cost_micros to cap it."""
+        return self.call("get_referring_domains", _present({"clientId": client_id, "domain": domain, "source": source, "limit": limit, "maxCostMicros": max_cost_micros}))
+
+    def get_rendering_report(self, *, client_id: str, crawl_id: Optional[str] = None, limit: Optional[int] = None) -> Any:
+        """What JavaScript changes. Pages the crawl rendered with JavaScript, compared with
+        their raw HTML: words and links that exist only after JavaScript runs, and a
+        title, canonical, meta robots, H1, description or structured data that
+        JavaScript changes — what a search engine or an AI crawler that does not run
+        scripts never sees. Answers 'does our content depend on JavaScript'. Turn
+        rendering on with set_crawl_settings render. Free."""
+        return self.call("get_rendering_report", _present({"clientId": client_id, "crawlId": crawl_id, "limit": limit}))
+
     def get_run_status(self, *, client_id: str, job: Literal["rank", "domain"], run_id: str) -> Any:
         """Get the status of a run. How a run started with refresh_rankings or
         refresh_domain_data is going: running, done or failed, and — when it failed or
@@ -953,6 +1220,25 @@ class Tools:
         missing vendor key, an unreachable site). Answers 'did that capture work'. A run
         id that is not this client's, or that has aged out, reads as unknown."""
         return self.call("get_run_status", _present({"clientId": client_id, "job": job, "runId": run_id}))
+
+    def get_search_appearance(self, *, client_id: str, days: Optional[int] = None, compare: Optional[Literal["previous", "year"]] = None) -> Any:
+        """Search traffic by result kind. Google web search clicks and impressions by
+        search appearance — rich results, videos, FAQ and review snippets, AMP and the
+        other result kinds Search Console reports — two periods compared. Answers 'are
+        our rich results earning clicks' and 'did we lose a result type'. Collected from
+        the day this was added, and back sixteen months once a connection's history has
+        been filled. Free."""
+        return self.call("get_search_appearance", _present({"clientId": client_id, "days": days, "compare": compare}))
+
+    def get_search_changes(self, *, client_id: str, days: Optional[int] = None, compare: Optional[Literal["previous", "year"]] = None, dimension: Optional[Literal["query", "page"]] = None, brand: Optional[Literal["all", "branded", "non_branded"]] = None, country: Optional[str] = None, device: Optional[Literal["DESKTOP", "MOBILE", "TABLET"]] = None, min_impressions: Optional[int] = None, limit: Optional[int] = None) -> Any:
+        """What changed in search. Two periods of Google search compared, by query or by
+        page: what is new (shown now, not at all before), what was lost, and the biggest
+        gainers and losers by clicks. Answers 'which queries did we start ranking for',
+        'what did we lose this week' and 'which pages are growing'. brand narrows to
+        branded or non-branded queries (non-branded is what SEO work moves); country and
+        device segment it. Periods end on the newest day Google has finished counting.
+        Free."""
+        return self.call("get_search_changes", _present({"clientId": client_id, "days": days, "compare": compare, "dimension": dimension, "brand": brand, "country": country, "device": device, "minImpressions": min_impressions, "limit": limit}))
 
     def get_search_console_performance(self, *, client_id: str, from_: str, to: str, search_type: Optional[Literal["web", "image", "video", "news", "discover", "googleNews"]] = None, country: Optional[str] = None, device: Optional[Literal["DESKTOP", "MOBILE", "TABLET"]] = None, dimensions: Optional[List[Literal["date", "query", "page", "country", "device"]]] = None, page: Optional[str] = None, query: Optional[str] = None) -> Any:
         """What Google Search Console measured. Clicks, impressions and position from the
@@ -987,6 +1273,25 @@ class Tools:
         a sentence when the client has not connected a GA4 property. Free."""
         return self.call("get_search_opportunities", _present({"clientId": client_id, "from": from_, "to": to, "compare": compare, "limit": limit}))
 
+    def get_search_timeline(self, *, client_id: str, from_: Optional[str] = None, to: Optional[str] = None) -> Any:
+        """Search traffic with what happened. Daily Google web search clicks and
+        impressions (and non-branded clicks) beside the client's timeline: deploys,
+        publishes, campaigns and notes, and Google's algorithm updates. Answers 'what
+        caused this drop' and 'did the release help'. Free."""
+        return self.call("get_search_timeline", _present({"clientId": client_id, "from": from_, "to": to}))
+
+    def get_serp_content_profile(self, *, client_id: str, keyword: str, depth: Optional[int] = None, location_code: Optional[int] = None, language_code: Optional[str] = None, max_cost_micros: Optional[int] = None) -> Any:
+        """What the ranking pages have in common. Reads the top Google results for a
+        keyword and each ranking page, and reports what they share: word count range,
+        the outline themes most of them cover, the terms they use and how often, the
+        questions they answer, tables, lists, images, video, schema types, reading ease
+        and how recently they were updated — plus People Also Ask and related searches,
+        and each page's own summary. Answers 'what does it take to rank for this'. The
+        results page is a paid lookup on the client's account unless someone bought it
+        in the last day (spend says which); the pages are fetched free. Can spend: pass
+        max_cost_micros to cap it."""
+        return self.call("get_serp_content_profile", _present({"clientId": client_id, "keyword": keyword, "depth": depth, "locationCode": location_code, "languageCode": language_code, "maxCostMicros": max_cost_micros}))
+
     def get_serp_features(self, *, client_id: str, tracker_id: str, device: Optional[Literal["desktop", "mobile"]] = None) -> Any:
         """Get SERP features. Which search features — featured snippet, AI Overview, local
         pack, video, People Also Ask and others — appeared on each tracked keyword's
@@ -994,6 +1299,14 @@ class Tools:
         snippets and overviews do we own'. Features are null for a capture whose source
         did not report them, which is not the same as a page with none."""
         return self.call("get_serp_features", _present({"clientId": client_id, "trackerId": tracker_id, "device": device}))
+
+    def get_serp_volatility(self, *, client_id: str, tracker_id: Optional[str] = None, days: Optional[int] = None) -> Any:
+        """How much the results are moving. How much page one moved between readings for
+        each tracked keyword (0 still, ~10 turned over), a daily index for the client's
+        keywords beside an industry-wide one from every keyword in the archive, and
+        Google's updates in the window. Answers 'is it us or is it Google' when rankings
+        move. Free."""
+        return self.call("get_serp_volatility", _present({"clientId": client_id, "trackerId": tracker_id, "days": days}))
 
     def get_share_of_voice(self, *, client_id: str, tracker_id: str) -> Any:
         """Get share of voice. The client's share of available search clicks across its
@@ -1023,6 +1336,18 @@ class Tools:
         Answers 'what is being looked for right now' for keyword discovery, without a
         vendor's list in between. Terms below the reporting floor never appear."""
         return self.call("get_top_searches", _present({"market": market, "since": since, "limit": limit}))
+
+    def get_topic_map(self, *, client_id: str, seed: Optional[str] = None, days: Optional[int] = None, extra_keywords: Optional[List[str]] = None, method: Optional[Literal["serp_overlap", "search_console"]] = None, limit: Optional[int] = None, min_shared: Optional[int] = None, location_code: Optional[int] = None, language_code: Optional[str] = None, max_cost_micros: Optional[int] = None) -> Any:
+        """Map topics to pages. The client's topics from Search Console (non-branded
+        queries, optionally containing a seed) plus any extra keywords, grouped into
+        clusters and pillars, each mapped to the pages Google shows for it: no_page
+        (write it), one_page, or several_pages (impressions split between pages — merge
+        or fix internal links). Answers 'what should we write next', 'which topics have
+        no page' and 'where are our pages competing'. method serp_overlap clusters by
+        results-page overlap (one paid lookup per keyword unless bought in the last
+        day); search_console clusters by the page each query lands on, free. Can spend:
+        pass max_cost_micros to cap it."""
+        return self.call("get_topic_map", _present({"clientId": client_id, "seed": seed, "days": days, "extraKeywords": extra_keywords, "method": method, "limit": limit, "minShared": min_shared, "locationCode": location_code, "languageCode": language_code, "maxCostMicros": max_cost_micros}))
 
     def get_url_swaps(self, *, client_id: str, tracker_id: str, days: Optional[int] = None, device: Optional[Literal["desktop", "mobile"]] = None) -> Any:
         """Get ranking URL swaps. Tracked keywords whose ranking page changed over a period
@@ -1144,6 +1469,12 @@ class Tools:
         fired."""
         return self.call("list_alert_rules", _present({"clientId": client_id}))
 
+    def list_annotations(self, *, client_id: str, from_: Optional[str] = None, to: Optional[str] = None, include_google: Optional[bool] = None) -> Any:
+        """List the client's timeline. The client's timeline notes between two days, oldest
+        first, with Google's algorithm updates when includeGoogle is true. Answers 'what
+        changed around then'. Free."""
+        return self.call("list_annotations", _present({"clientId": client_id, "from": from_, "to": to, "includeGoogle": include_google}))
+
     def list_api_activity(self, *, since_hours: Optional[int] = None, key_id: Optional[str] = None, limit: Optional[int] = None) -> Any:
         """List API activity. Recent tool calls made with the agency's keys — which key,
         which tool, which client, how it ended and how long it took — newest first.
@@ -1167,6 +1498,13 @@ class Tools:
         client it was given, who approved it, and when it was last used. Answers 'what
         has access to our account'."""
         return self.call("list_connected_apps", {})
+
+    def list_conversion_goals(self, *, client_id: str, days: Optional[int] = None) -> Any:
+        """The events a site sends. The custom events the client's site sends to the
+        cookieless analytics, most-sent first, with how many carry a value — the goals
+        get_conversions can count. Answers 'what are we tracking'. Says how to send one
+        when there are none. Free."""
+        return self.call("list_conversion_goals", _present({"clientId": client_id, "days": days}))
 
     def list_crawl_issues(self, *, client_id: str, crawl_id: Optional[str] = None) -> Any:
         """List site audit issues. Technical issues one crawl found, by rule: its readable
@@ -1340,6 +1678,17 @@ class Tools:
         changed says how many moved. Answers 'keep these at the top'. Free."""
         return self.call("pin_tracked_keywords", _present({"clientId": client_id, "trackerId": tracker_id, "keywordIds": keyword_ids, "pinned": pinned}))
 
+    def query_data(self, *, client_id: str, dataset: Literal["gsc", "web_events", "crawl_pages", "crawl_issues", "crawl_links", "rank_captures", "backlinks"], dimensions: Optional[List[str]] = None, metrics: Optional[List[str]] = None, columns: Optional[List[str]] = None, filters: Optional[List[Dict[str, Any]]] = None, from_: Optional[str] = None, to: Optional[str] = None, order_by: Optional[List[Dict[str, Any]]] = None, crawl_id: Optional[str] = None, limit: Optional[int] = None) -> Any:
+        """Query the stored data. Asks any question of a client's stored data the other
+        tools do not answer: pick a dataset (describe_datasets), group by dimensions,
+        compute metrics (count, sum(col), avg(col), min, max, uniq, plus ctr and
+        position for Search Console, visitors and visits for analytics), filter (eq,
+        neq, contains, starts_with, gt, lt, in, regex), order and limit — or list rows
+        with columns. Answers 'which queries containing X lost clicks on mobile in
+        Spain', 'how many 404s per template'. Read-only and always limited to the
+        client's own data. Up to 10,000 rows; export_data for more. Free."""
+        return self.call("query_data", _present({"clientId": client_id, "dataset": dataset, "dimensions": dimensions, "metrics": metrics, "columns": columns, "filters": filters, "from": from_, "to": to, "orderBy": order_by, "crawlId": crawl_id, "limit": limit}))
+
     def queue_url_inspections(self, *, client_id: str, urls: List[str]) -> Any:
         """Queue URLs for Search Console inspection. Queues up to 500 of the client's URLs
         for Search Console's URL inspection, which runs in the background within
@@ -1381,6 +1730,12 @@ class Tools:
         the same minute lands on the run already going rather than paying twice. Can
         spend: pass max_cost_micros to cap it."""
         return self.call("refresh_rankings", _present({"clientId": client_id, "maxCostMicros": max_cost_micros}))
+
+    def remove_annotations(self, *, client_id: str, ids: List[str]) -> Any:
+        """Remove timeline notes. Removes the client's timeline notes by id; unknown ids
+        are ignored. Answers 'take that note off'. Google's updates cannot be removed.
+        Free."""
+        return self.call("remove_annotations", _present({"clientId": client_id, "ids": ids}))
 
     def remove_competitors(self, *, client_id: str, tracker_id: str, domains: List[str]) -> Any:
         """Remove competitors from a tracker. Stops measuring the named competitor domains
@@ -1520,6 +1875,17 @@ class Tools:
         report. A report can have more than one schedule."""
         return self.call("schedule_report", _present({"clientId": client_id, "reportId": report_id, "cadence": cadence, "recipients": recipients}))
 
+    def score_content(self, *, client_id: str, keyword: str, url: Optional[str] = None, html: Optional[str] = None, markdown: Optional[str] = None, location_code: Optional[int] = None, language_code: Optional[str] = None, max_cost_micros: Optional[int] = None) -> Any:
+        """Score a draft before publishing. Scores a draft (a URL, HTML or Markdown) 0–100
+        against the pages that rank for its keyword: term coverage, outline coverage,
+        questions answered, length and structure — with the missing terms (and how often
+        to use them), missing sections, unanswered questions and a fix list, most
+        important first. Answers 'is this ready to publish' and 'what should I add'. Run
+        it after each revision until it is at par with the results page. Same cost as
+        get_serp_content_profile; a results page bought for the brief is reused free for
+        a day. Can spend: pass max_cost_micros to cap it."""
+        return self.call("score_content", _present({"clientId": client_id, "keyword": keyword, "url": url, "html": html, "markdown": markdown, "locationCode": location_code, "languageCode": language_code, "maxCostMicros": max_cost_micros}))
+
     def send_report(self, *, client_id: str, report_id: str, idempotency_key: Optional[str] = None) -> Any:
         """Send a report now. Sends a saved report to its scheduled recipients now,
         covering the month just gone. Answers 'send the report'. Recipients come from
@@ -1553,6 +1919,18 @@ class Tools:
         must be an https:// address and the colour six-digit hex such as #1f5ad6; empty
         strings clear them. Send all three: this replaces what is there."""
         return self.call("set_branding", _present({"name": name, "logoUrl": logo_url, "primaryColor": primary_color}))
+
+    def set_crawl_settings(self, *, client_id: str, strip_params: Optional[List[str]] = None, extractions: Optional[List[Dict[str, Any]]] = None, render: Optional[Literal["off", "shells", "all"]] = None, render_max_pages: Optional[int] = None) -> Any:
+        """Change how the site is crawled. Changes the client's crawl settings for the next
+        crawl; fields left out are kept. stripParams removes query parameters from every
+        discovered URL (names, or prefixes like utm_*), so sorted and filtered copies of
+        a page are crawled once. extractions reads values off every page (up to 10): css
+        (a selector, optionally an attribute), regex (first group), jsonld
+        ('Article.datePublished') or meta (a name or property) — see
+        get_extraction_results. render runs JavaScript: off, shells (pages that look
+        unrendered) or all, capped at renderMaxPages. Answers 'crawl this site this
+        way'. Free."""
+        return self.call("set_crawl_settings", _present({"clientId": client_id, "stripParams": strip_params, "extractions": extractions, "render": render, "renderMaxPages": render_max_pages}))
 
     def set_keyword_notes(self, *, list_id: str, notes: List[Dict[str, Any]]) -> Any:
         """Note why keywords are on a list. Sets notes on keywords in a list — why each is
@@ -1664,6 +2042,16 @@ class Tools:
         it."""
         return self.call("suggest_ai_prompts", _present({"clientId": client_id, "topic": topic, "count": count, "maxCostMicros": max_cost_micros}))
 
+    def suggest_internal_links(self, *, client_id: str, crawl_id: Optional[str] = None, target_url: Optional[str] = None, phrases: Optional[List[str]] = None, limit: Optional[int] = None) -> Any:
+        """Suggest internal links. Pages that already mention a topic in their text but do
+        not link to the page about it, with the exact sentence and the words to use as
+        the anchor, strongest linking pages first. Give targetUrl (and phrases, default:
+        its title and H1 and the queries it ranks for); without a target, it picks the
+        client's pages in striking distance in Search Console (positions 4–20) — where
+        an internal link moves rankings most. Answers 'where should we add internal
+        links'. Free."""
+        return self.call("suggest_internal_links", _present({"clientId": client_id, "crawlId": crawl_id, "targetUrl": target_url, "phrases": phrases, "limit": limit}))
+
     def sync_local_reviews(self, *, client_id: str, location_id: str, max_cost_micros: Optional[int] = None) -> Any:
         """Collect a location's Google reviews. Collects the location's latest Google
         reviews (up to 50) from the vendor. Paid: quote it with estimate_cost first.
@@ -1695,18 +2083,19 @@ class Tools:
         cap is enforced on every paid lookup from then on."""
         return self.call("update_client", _present({"clientId": client_id, "name": name, "monthlyBudgetUsd": monthly_budget_usd}))
 
-    def update_client_brief(self, *, client_id: str, overview: Optional[str] = None, goal: Optional[str] = None, positioning: Optional[str] = None, audience: Optional[str] = None, voice: Optional[str] = None, add: Optional[List[Dict[str, Any]]] = None, update: Optional[List[Dict[str, Any]]] = None, remove: Optional[List[str]] = None) -> Any:
+    def update_client_brief(self, *, client_id: str, overview: Optional[str] = None, goal: Optional[str] = None, positioning: Optional[str] = None, audience: Optional[str] = None, voice: Optional[str] = None, add: Optional[List[Dict[str, Any]]] = None, update: Optional[List[Dict[str, Any]]] = None, remove: Optional[List[str]] = None, brand_terms: Optional[List[str]] = None) -> Any:
         """Update the client brief. Changes the client brief that every teammate and agent
         reads. Answers 'remember this about the client'. Set fields (overview, goal,
         positioning, audience, voice; null or empty clears one, fields left out are
         untouched); add entries (kind competitor, key_page, section or research, each
         with a title and optional body and url); edit entries by id; remove entries by
-        id (unknown ids are ignored). Applied in that order, so removing an old
+        id (unknown ids are ignored); replace the brand terms (brandTerms) that split
+        branded from non-branded search. Applied in that order, so removing an old
         competitor and adding its replacement in one call works. Record a research entry
         when you finish a piece of work whose conclusions the next one should start
         from; the 50 newest research notes are kept. Returns the brief as it now stands.
         Free."""
-        return self.call("update_client_brief", _present({"clientId": client_id, "overview": overview, "goal": goal, "positioning": positioning, "audience": audience, "voice": voice, "add": add, "update": update, "remove": remove}))
+        return self.call("update_client_brief", _present({"clientId": client_id, "overview": overview, "goal": goal, "positioning": positioning, "audience": audience, "voice": voice, "add": add, "update": update, "remove": remove, "brandTerms": brand_terms}))
 
     def update_rank_tracker(self, *, client_id: str, tracker_id: str, name: Optional[str] = None, device: Optional[Literal["desktop", "mobile", "both"]] = None, frequency: Optional[Literal["daily", "weekly"]] = None) -> Any:
         """Update a rank tracker. Renames a tracker or changes its device (desktop, mobile
