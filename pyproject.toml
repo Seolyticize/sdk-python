@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "seolyticize"
-version = "0.3.0"
+version = "0.4.0"
 description = "Seolyticize for Python: every API tool as a method, and on-site helpers for analytics, IndexNow and deploys."
 readme = "README.md"
 license = { text = "MIT" }

@@ -63,7 +63,7 @@ def _post(url: str, body: Dict[str, Any], timeout: float) -> Dict[str, Any]:
         url,
         data=json.dumps(body).encode("utf-8"),
         method="POST",
-        headers={"content-type": "application/json", "user-agent": "seolyticize-python-site/0.3.0"},
+        headers={"content-type": "application/json", "user-agent": "seolyticize-python-site/0.4.0"},
     )
     with urllib.request.urlopen(request, timeout=timeout) as response:
         text = response.read().decode("utf-8")
