@@ -4,6 +4,9 @@
 - :func:`indexnow_key_response` — the body and headers to serve your IndexNow key file.
 - :func:`notify_deploy` — call after each deploy; changed pages go to IndexNow.
 - :func:`track_event` — send a pageview or custom event from your server.
+
+For page views reported from the server with the visitor's own address and
+user agent (and AI assistants counted), see :mod:`seolyticize.collect`.
 """
 
 from __future__ import annotations
@@ -60,7 +63,7 @@ def _post(url: str, body: Dict[str, Any], timeout: float) -> Dict[str, Any]:
         url,
         data=json.dumps(body).encode("utf-8"),
         method="POST",
-        headers={"content-type": "application/json", "user-agent": "seolyticize-python-site/0.2.0"},
+        headers={"content-type": "application/json", "user-agent": "seolyticize-python-site/0.3.0"},
     )
     with urllib.request.urlopen(request, timeout=timeout) as response:
         text = response.read().decode("utf-8")
