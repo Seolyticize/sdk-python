@@ -3,7 +3,7 @@
 Every [Seolyticize](https://seolyticize.com) API tool (about 500 in 0.4.0) as a method, and on-site helpers for analytics, IndexNow and deploys. Standard library only, Python 3.9+.
 
 ```sh
-pip install "git+https://github.com/Seolyticize/sdk-python"
+pip install seolyticize
 ```
 
 ## Quick start
