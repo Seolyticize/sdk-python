@@ -408,7 +408,7 @@ class Tools:
         assistants reading'. Free."""
         return self.call("analyse_server_log", _present({"clientId": client_id, "contents": contents}))
 
-    def apply_manifest(self, *, domain: str, name: Optional[str] = None, framework: Optional[Literal["nextjs", "astro", "remix", "sveltekit", "nuxt", "html", "wordpress", "other"]] = None, verification: Optional[Literal["file", "meta", "dns"]] = None, tracker_frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None, monthly_budget_usd: Optional[float] = None, budget_alert_at: Optional[float] = None, domain_sweep: Optional[bool] = None, deploy_hook: Optional[bool] = None, brief: Optional[Dict[str, Any]] = None, analytics: Optional[Dict[str, Any]] = None, crawl: Optional[Dict[str, Any]] = None, alerts: Optional[Dict[str, Any]] = None, facts: Optional[List[Dict[str, Any]]] = None, goals: Optional[List[Dict[str, Any]]] = None, funnels: Optional[List[Dict[str, Any]]] = None, dry_run: Optional[bool] = None) -> Any:
+    def apply_manifest(self, *, domain: str, name: Optional[str] = None, framework: Optional[Literal["nextjs", "astro", "remix", "sveltekit", "nuxt", "html", "wordpress", "other"]] = None, verification: Optional[Literal["file", "meta", "dns"]] = None, tracker_frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None, monthly_budget_usd: Optional[float] = None, budget_alert_at: Optional[float] = None, domain_sweep: Optional[bool] = None, deploy_hook: Optional[bool] = None, health_key: Optional[bool] = None, brief: Optional[Dict[str, Any]] = None, analytics: Optional[Dict[str, Any]] = None, crawl: Optional[Dict[str, Any]] = None, alerts: Optional[Dict[str, Any]] = None, facts: Optional[List[Dict[str, Any]]] = None, goals: Optional[List[Dict[str, Any]]] = None, funnels: Optional[List[Dict[str, Any]]] = None, dry_run: Optional[bool] = None) -> Any:
         """Bring a client to what its repo declares. Answers 'provision our product from
         its manifest' in one call that is safe to run on every deploy. Takes what a
         repository declares about its site (domain, framework, verification, tracker
@@ -423,7 +423,7 @@ class Tools:
         build (read at build time), runtime and secrets, with public ids as values and
         secrets only as a placeholder naming the tool that issues them. A new deploy
         hook's secret is in its step's result only, once. Free."""
-        return self.call("apply_manifest", _present({"domain": domain, "name": name, "framework": framework, "verification": verification, "trackerFrequency": tracker_frequency, "monthlyBudgetUsd": monthly_budget_usd, "budgetAlertAt": budget_alert_at, "domainSweep": domain_sweep, "deployHook": deploy_hook, "brief": brief, "analytics": analytics, "crawl": crawl, "alerts": alerts, "facts": facts, "goals": goals, "funnels": funnels, "dryRun": dry_run}))
+        return self.call("apply_manifest", _present({"domain": domain, "name": name, "framework": framework, "verification": verification, "trackerFrequency": tracker_frequency, "monthlyBudgetUsd": monthly_budget_usd, "budgetAlertAt": budget_alert_at, "domainSweep": domain_sweep, "deployHook": deploy_hook, "healthKey": health_key, "brief": brief, "analytics": analytics, "crawl": crawl, "alerts": alerts, "facts": facts, "goals": goals, "funnels": funnels, "dryRun": dry_run}))
 
     def archive_client(self, *, client_id: str) -> Any:
         """Archive a client. Retires a client: it stops being tracked, crawled and reported
@@ -943,7 +943,7 @@ class Tools:
         the analytics to BigQuery daily'. Free."""
         return self.call("create_data_sync", _present({"clientId": client_id, "destination": destination, "name": name, "query": query, "mode": mode, "windowDays": window_days, "cadence": cadence, "runHour": run_hour, "spreadsheetId": spreadsheet_id, "sheet": sheet, "baseId": base_id, "table": table, "projectId": project_id, "datasetId": dataset_id, "tableId": table_id}))
 
-    def create_deploy_hook(self, *, client_id: str, sitemap_url: Optional[str] = None, if_missing: Optional[bool] = None) -> Any:
+    def create_deploy_hook(self, *, client_id: str, sitemap_url: Optional[str] = None, sitemaps: Optional[List[str]] = None, path_url: Optional[bool] = None, if_missing: Optional[bool] = None) -> Any:
         """Create a deploy hook. Answers 'tell search engines whenever we deploy'. Makes
         the client's deploy hook, which the site's pipeline calls after every deploy.
         Each call reads the sitemap, compares it with the last one, and submits the new
@@ -953,12 +953,14 @@ class Tools:
         Returns hookId and url (neither is secret), secret (sent as Authorization:
         Bearer; shown only here), webhookUrl (the secret in the path, only for senders
         that cannot set a header, such as Netlify, Vercel, Cloudflare Pages and
-        Forumulate; treat that whole URL as a secret) and howToCall for each platform. A
-        client that already has a hook is refused with hook_exists and nothing changes;
-        rotate_deploy_hook replaces the secret. With ifMissing: true an existing hook is
-        left alone and returned as {created: false} without a secret, so a provisioning
-        script can run it on every deploy safely. Free."""
-        return self.call("create_deploy_hook", _present({"clientId": client_id, "sitemapUrl": sitemap_url, "ifMissing": if_missing}))
+        Forumulate; treat that whole URL as a secret, since tools print URLs; it works
+        for as long as the hook does, by design, and pathUrl: false leaves it out of the
+        answer) and howToCall for each platform. A client that already has a hook is
+        refused with hook_exists and nothing changes; rotate_deploy_hook replaces the
+        secret. With ifMissing: true an existing hook is left alone and returned as
+        {created: false} without a secret, so a provisioning script can run it on every
+        deploy safely. Free."""
+        return self.call("create_deploy_hook", _present({"clientId": client_id, "sitemapUrl": sitemap_url, "sitemaps": sitemaps, "pathUrl": path_url, "ifMissing": if_missing}))
 
     def create_funnel(self, *, client_id: str, name: str, steps: List[Dict[str, Any]], upsert_by: Optional[Literal["name"]] = None, dry_run: Optional[bool] = None) -> Any:
         """Define a funnel. Defines a funnel: 2 to 8 steps (a page reached or an event
@@ -4442,7 +4444,7 @@ class Tools:
         Google the vacancy is filled'."""
         return self.call("notify_google_indexing", _present({"clientId": client_id, "urls": urls, "type": type_, "dryRun": dry_run}))
 
-    def onboard_site(self, *, domain: str, name: Optional[str] = None, framework: Optional[Literal["nextjs", "astro", "remix", "sveltekit", "nuxt", "html", "wordpress", "other"]] = None, keywords: Optional[List[str]] = None, verification: Optional[Literal["file", "meta", "dns"]] = None, tracker_frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None) -> Any:
+    def onboard_site(self, *, domain: str, name: Optional[str] = None, framework: Optional[Literal["nextjs", "astro", "remix", "sveltekit", "nuxt", "html", "wordpress", "other"]] = None, keywords: Optional[List[str]] = None, verification: Optional[Literal["file", "meta", "dns"]] = None, health_key: Optional[bool] = None, tracker_frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None) -> Any:
         """Onboard a site in one call. Answers 'set this site up'. Makes the client,
         project, site and rank tracker — or finds the client already here for this
         domain, so calling it twice is safe — issues the IndexNow key and a Google site
@@ -4454,7 +4456,7 @@ class Tools:
         trackerFrequency says otherwise, and the weekly domain sweep stays off until
         set_domain_sweep). Deploy all of it, then call verify_site. No Google sign-in or
         Search Console settings are needed at any point. Free."""
-        return self.call("onboard_site", _present({"domain": domain, "name": name, "framework": framework, "keywords": keywords, "verification": verification, "trackerFrequency": tracker_frequency}))
+        return self.call("onboard_site", _present({"domain": domain, "name": name, "framework": framework, "keywords": keywords, "verification": verification, "healthKey": health_key, "trackerFrequency": tracker_frequency}))
 
     def page_headers(self, *, url: str, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
         """What the server actually returned. Status code, redirect chain, content type and
@@ -4830,14 +4832,14 @@ class Tools:
         max_cost_micros to cap it."""
         return self.call("rewrite_section", _present({"clientId": client_id, "keyword": keyword, "section": section, "mode": mode, "missingTerms": missing_terms, "questions": questions, "draft": draft, "url": url, "instructions": instructions, "locationCode": location_code, "languageCode": language_code, "maxCostMicros": max_cost_micros, "dryRun": dry_run}))
 
-    def rotate_deploy_hook(self, *, client_id: str, sitemap_url: Optional[str] = None) -> Any:
+    def rotate_deploy_hook(self, *, client_id: str, sitemap_url: Optional[str] = None, sitemaps: Optional[List[str]] = None, path_url: Optional[bool] = None) -> Any:
         """Rotate the deploy hook's secret. Answers 'that deploy hook secret leaked,
         replace it' and 'point the hook at another sitemap'. Replaces the secret: the
         old secret and the old webhookUrl stop working at once, while hookId, url and
         the sitemap baseline stay. Returns the new secret and webhookUrl once, with
         howToCall. Pass sitemapUrl to change the sitemap read; without it the current
         one is kept. Free."""
-        return self.call("rotate_deploy_hook", _present({"clientId": client_id, "sitemapUrl": sitemap_url}))
+        return self.call("rotate_deploy_hook", _present({"clientId": client_id, "sitemapUrl": sitemap_url, "sitemaps": sitemaps, "pathUrl": path_url}))
 
     def run_ai_visibility_check(self, *, client_id: str, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
         """Run an AI visibility check now. Asks every tracked question on the chosen
