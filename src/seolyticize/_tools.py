@@ -1101,9 +1101,11 @@ class Tools:
         sends missed ones again. Events: crawl.completed, gsc.synced, rank.moved,
         backlink.new, backlink.lost, issue.new_critical, ai.citation.gained,
         ai.citation.lost, competitor.page.new, budget.threshold, alert.fired,
-        vendor.balance_low, vendor.balance_empty. clientId limits it to one client; null
-        is every client. The secret is in the response once. Answers 'tell my system
-        when a crawl finishes'. Free."""
+        vendor.balance_low, vendor.balance_empty. vendor.balance_low and
+        vendor.balance_empty fire at most once a week while the balance stays low, not
+        once per crossing. clientId limits it to one client; null is every client. The
+        secret is in the response once. Answers 'tell my system when a crawl finishes'.
+        Free."""
         return self.call("create_webhook", _present({"clientId": client_id, "url": url, "events": events}))
 
     def delete_alert_rule(self, *, client_id: str, rule_id: str) -> Any:
@@ -2264,12 +2266,14 @@ class Tools:
     def get_conversions(self, *, client_id: str, source: Optional[Literal["web_analytics", "ga4"]] = None, by: Optional[Literal["landing_page", "source", "referrer"]] = None, channel: Optional[Literal["all", "search", "ai"]] = None, goals: Optional[List[str]] = None, days: Optional[int] = None, limit: Optional[int] = None) -> Any:
         """Conversions by landing page and source. Conversions (sign-ups, purchases, any
         goal) by the page a visit landed on, its source or its referrer, with visits,
-        converting visits, conversion rate and value — and, by landing page, the Search
-        Console queries that bring those visits. Answers 'which pages and queries
-        actually make money' and 'what is organic search worth'. source web_analytics
-        uses the cookieless analytics' custom events (goals: the event names; default
-        every event; value from a 'value' property); ga4 uses GA4's key events on
-        organic sessions. channel narrows to search engines or AI assistants. Free."""
+        converting visits, conversion rate (of visits with a pageview, null when there
+        are none) and value — and, by landing page, the Search Console queries that
+        bring those visits. Answers 'which pages and queries actually make money' and
+        'what is organic search worth'. source web_analytics uses the cookieless
+        analytics' custom events (goals: the event names; default the client's event
+        goals, or every event when it has none, which a note says; value from a 'value'
+        property); ga4 uses GA4's key events on organic sessions. channel narrows to
+        search engines or AI assistants. Free."""
         return self.call("get_conversions", _present({"clientId": client_id, "source": source, "by": by, "channel": channel, "goals": goals, "days": days, "limit": limit}))
 
     def get_costs(self, *, since_days: Optional[int] = None) -> Any:

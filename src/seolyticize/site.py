@@ -33,7 +33,7 @@ def analytics_tag(
     ``track=["outbound", "downloads"]`` records those clicks as events.
     Mark it safe in your template engine (``|safe`` in Django or Jinja).
     """
-    attrs = {"defer": None, "data-site": site_key, "src": f"{base_url.rstrip('/')}/a.js"}
+    attrs = {"defer": None, "data-site": site_key, "src": f"{base_url.rstrip('/')}/a.js?v=2"}
     if exclude:
         attrs["data-exclude"] = ",".join(exclude)
     if include:
