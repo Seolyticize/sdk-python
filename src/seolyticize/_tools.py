@@ -183,6 +183,7 @@ READ_ONLY_TOOLS = frozenset({
     "get_vitals_history",
     "get_volume_calibration",
     "get_web_analytics_breakdown",
+    "get_web_analytics_realtime",
     "get_web_analytics_setup",
     "get_web_analytics_summary",
     "get_written_report",
@@ -201,6 +202,7 @@ READ_ONLY_TOOLS = frozenset({
     "list_api_keys",
     "list_client_facts",
     "list_clients",
+    "list_collect_keys",
     "list_connected_apps",
     "list_content_plan",
     "list_conversion_goals",
@@ -208,6 +210,7 @@ READ_ONLY_TOOLS = frozenset({
     "list_crawls",
     "list_data_syncs",
     "list_digest_schedules",
+    "list_external_event_senders",
     "list_funnels",
     "list_goals",
     "list_integrations",
@@ -260,7 +263,7 @@ READ_ONLY_TOOLS = frozenset({
     "whoami",
 })
 
-TOOL_COUNT = 511
+TOOL_COUNT = 519
 
 
 def _present(values: Dict[str, Any]) -> Dict[str, Any]:
@@ -318,7 +321,7 @@ class Tools:
         list. Domains already there are left as they are."""
         return self.call("add_competitors", _present({"clientId": client_id, "trackerId": tracker_id, "domains": domains}))
 
-    def add_default_alerts(self, *, client_id: Optional[str] = None, all_clients: Optional[bool] = None, channel: Optional[Literal["slack", "webhook", "discord", "email", "telegram"]] = None, webhook_url: Optional[str] = None, email_recipients: Optional[List[str]] = None, telegram_chat_id: Optional[str] = None, include: Optional[List[Literal["page-changes"]]] = None) -> Any:
+    def add_default_alerts(self, *, client_id: Optional[str] = None, all_clients: Optional[bool] = None, channel: Optional[Literal["slack", "webhook", "discord", "email", "telegram", "watchtower", "hermetica"]] = None, webhook_url: Optional[str] = None, email_recipients: Optional[List[str]] = None, telegram_chat_id: Optional[str] = None, include: Optional[List[Literal["page-changes"]]] = None, uptime_monitored_elsewhere: Optional[bool] = None) -> Any:
         """Add the default alerts. Gives a client the four alerts every new client now
         starts with: the site goes down (site-unreachable), non-branded Search Console
         clicks fall 30% or more week on week (traffic-drop 30), a crawl finds critical
@@ -327,12 +330,13 @@ class Tools:
         update_alert_rule. A kind the client already has a rule for is kept as it is, so
         it is safe to repeat. channel with webhookUrl (slack, webhook, discord),
         emailRecipients (email) or telegramChatId (telegram) sends them there instead,
-        and moves default rules still going only to the owner's email (moved). include:
-        ["page-changes"] adds a fifth: own pages whose title, meta description, H1 or
-        canonical changed, went noindex or 404. Pass clientId for one client, or
-        allClients: true for every live client the key may manage. Answers 'set up the
-        usual alerts'. Free."""
-        return self.call("add_default_alerts", _present({"clientId": client_id, "allClients": all_clients, "channel": channel, "webhookUrl": webhook_url, "emailRecipients": email_recipients, "telegramChatId": telegram_chat_id, "include": include}))
+        and moves default rules still going only to the owner's email (moved).
+        uptimeMonitoredElsewhere: true leaves site-unreachable out (and pauses an
+        existing one) when another monitor owns uptime. include: ["page-changes"] adds a
+        fifth: own pages whose title, meta description, H1 or canonical changed, went
+        noindex or 404. Pass clientId for one client, or allClients: true for every live
+        client the key may manage. Answers 'set up the usual alerts'. Free."""
+        return self.call("add_default_alerts", _present({"clientId": client_id, "allClients": all_clients, "channel": channel, "webhookUrl": webhook_url, "emailRecipients": email_recipients, "telegramChatId": telegram_chat_id, "include": include, "uptimeMonitoredElsewhere": uptime_monitored_elsewhere}))
 
     def add_keywords_to_list(self, *, list_id: str, keywords: List[Dict[str, Any]]) -> Any:
         """Add keywords to a list. Adds keywords to an existing list. Keywords already on
@@ -791,6 +795,34 @@ class Tools:
         needs project:manage."""
         return self.call("compare_sites", _present({"clientId": client_id, "a": a, "b": b, "paths": paths, "maxPages": max_pages, "sendCrawlAuthTo": send_crawl_auth_to, "followRedirect": follow_redirect}))
 
+    def connect_external_events(self, *, client_id: str, sender: str, sender_secret: Optional[str] = None, events: Optional[Dict[str, Any]] = None) -> Any:
+        """Count sign-ups from your auth or billing system as goals. Makes a system that
+        signs its webhooks (an auth provider, a billing system, your own backend) a
+        source of goal events, with no call from the app. A client can have several
+        senders (auth for sign-ups, billing for subscriptions), each named by sender and
+        all posting to one webhookUrl; a delivery belongs to the sender whose secret
+        verifies it. Adds the sender, or replaces the one of that name. Returns
+        webhookUrl to register with the sender and secret (whsec_…, shown only here;
+        calling again for the sender replaces it) to give it as the signing secret; a
+        sender that makes its own secret (Stripe, Svix, Clerk) has it passed as
+        senderSecret instead. Accepts Standard Webhooks signatures (webhook-*, svix-* or
+        atlas-* headers) and t=,v1= signatures (Stripe-Signature,
+        Seolyticize-Signature), five minutes' tolerance, a retried delivery counted
+        once. Each event whose type is in the sender's events (default user.created →
+        Signup, organization.created → Organization created, subscription.created →
+        Subscription started) is recorded as that goal event with the sender as its
+        source property, credited to the visit whose token (from seolyticize("visit") or
+        useVisit()) the event's object carries as seolyticize_visit, directly or in its
+        metadata (public_metadata, unsafe_metadata, metadata, user_metadata,
+        raw_user_meta_data, custom_data), so the goal report shows the landing page and
+        source of the visit that signed up. An event without a token, or of a type not
+        in events, is acknowledged and not counted. Needs the cookieless analytics set
+        up. list_external_event_senders lists them; remove_external_event_sender drops
+        one; disconnect_integration {provider: "external_events"} drops all. Answers
+        'count sign-ups from our auth provider', 'count Stripe subscriptions as goals'
+        and 'stop sending the Signup goal by hand'. Free."""
+        return self.call("connect_external_events", _present({"clientId": client_id, "sender": sender, "senderSecret": sender_secret, "events": events}))
+
     def connect_google_analytics_service_account(self, *, client_id: str, property_id: str) -> Any:
         """Connect GA4 by service account. Connects a client's GA4 property as the agency's
         Google service account, once the property's owner has added that address with
@@ -865,7 +897,7 @@ class Tools:
         returned. Free."""
         return self.call("connect_yandex_with_token", _present({"clientId": client_id, "token": token}))
 
-    def create_alert_rule(self, *, client_id: str, kind: Literal["rank-drop", "traffic-drop", "new-critical-issues", "backlinks-lost", "site-unreachable", "serp-features", "competitor-new-pages", "page-changes", "ai-mention-drop", "competitor-new-keywords", "web-mentions", "link-velocity"], threshold: int, cooldown_hours: Optional[int] = None, webhook_url: Optional[str] = None, channel: Optional[Literal["slack", "webhook", "discord", "email", "telegram"]] = None, email_recipients: Optional[List[str]] = None, telegram_chat_id: Optional[str] = None, paid_source: Optional[bool] = None) -> Any:
+    def create_alert_rule(self, *, client_id: str, kind: Literal["rank-drop", "traffic-drop", "new-critical-issues", "backlinks-lost", "site-unreachable", "serp-features", "competitor-new-pages", "page-changes", "ai-mention-drop", "competitor-new-keywords", "web-mentions", "link-velocity"], threshold: int, cooldown_hours: Optional[int] = None, webhook_url: Optional[str] = None, channel: Optional[Literal["slack", "webhook", "discord", "email", "telegram", "watchtower", "hermetica"]] = None, email_recipients: Optional[List[str]] = None, telegram_chat_id: Optional[str] = None, api_key: Optional[str] = None, watchtower_project_id: Optional[str] = None, hermetica_from: Optional[str] = None, paid_source: Optional[bool] = None) -> Any:
         """Create an alert rule. Raises an alert when a client's rankings, traffic, issues
         or backlinks cross a threshold, or the site goes down, and delivers it by
         channel. Threshold by kind: rank-drop positions fallen; traffic-drop percent
@@ -881,21 +913,28 @@ class Tools:
         look back to their last firing (a week at most) and stay silent until there is
         something to compare. Channels: slack (webhookUrl, Slack's format; the default),
         webhook (webhookUrl, plain JSON), discord (webhookUrl, the channel's Discord
-        webhook as Discord shows it), email (emailRecipients, up to ten) or telegram
-        (telegramChatId, with the agency's bot from Settings). Webhooks must be https
-        and public. With no channel and no destination, the alert goes to the agency
-        owner's email and deliveryNote says so; a channel named without its field is
-        refused as no_delivery_target. paidSource (competitor-new-keywords and
-        web-mentions only; off by default; needs spend permission) also buys the signal
-        from DataForSEO on every sweep: for competitor-new-keywords, Labs ranked
-        keywords each tracker competitor (up to 5) newly ranks for at the tracker's
-        market, not only tracked keywords; for web-mentions, pages DataForSEO's content
-        index first saw naming the brand, off the client's own domains. The sweep is
-        hourly but a purchase is reused from the archive while fresh, so it buys at most
-        once a week per competitor (once a day for mentions); it is capped by the
-        client's monthly budget, and a failed or over-budget read falls back to the free
-        signal. Quote it first with estimate_cost. Answers 'tell me when rankings drop'."""
-        return self.call("create_alert_rule", _present({"clientId": client_id, "kind": kind, "threshold": threshold, "cooldownHours": cooldown_hours, "webhookUrl": webhook_url, "channel": channel, "emailRecipients": email_recipients, "telegramChatId": telegram_chat_id, "paidSource": paid_source}))
+        webhook as Discord shows it), email (emailRecipients, up to ten) telegram
+        (telegramChatId, with the agency's bot from Settings), watchtower (apiKey and
+        watchtowerProjectId: posts an event to that Watchtower project with POST
+        /v1/projects/{prj}/events, alert_type error, warning or info by severity, source
+        seolyticize, aggregation_key the rule id, tags kind:<kind> and
+        client:<clientId>, and the detail and links in its text) or hermetica (apiKey,
+        hermeticaFrom and emailRecipients: the alert email sent through the client's own
+        Hermetica account with POST /v1/transactional/send). The apiKey is stored sealed
+        and never returned. Webhooks must be https and public. With no channel and no
+        destination, the alert goes to the agency owner's email and deliveryNote says
+        so; a channel named without its field is refused as no_delivery_target.
+        paidSource (competitor-new-keywords and web-mentions only; off by default; needs
+        spend permission) also buys the signal from DataForSEO on every sweep: for
+        competitor-new-keywords, Labs ranked keywords each tracker competitor (up to 5)
+        newly ranks for at the tracker's market, not only tracked keywords; for
+        web-mentions, pages DataForSEO's content index first saw naming the brand, off
+        the client's own domains. The sweep is hourly but a purchase is reused from the
+        archive while fresh, so it buys at most once a week per competitor (once a day
+        for mentions); it is capped by the client's monthly budget, and a failed or
+        over-budget read falls back to the free signal. Quote it first with
+        estimate_cost. Answers 'tell me when rankings drop'."""
+        return self.call("create_alert_rule", _present({"clientId": client_id, "kind": kind, "threshold": threshold, "cooldownHours": cooldown_hours, "webhookUrl": webhook_url, "channel": channel, "emailRecipients": email_recipients, "telegramChatId": telegram_chat_id, "apiKey": api_key, "watchtowerProjectId": watchtower_project_id, "hermeticaFrom": hermetica_from, "paidSource": paid_source}))
 
     def create_api_key(self, *, name: str, client_id: Optional[str] = None, role: Optional[Literal["client_viewer", "analyst", "manager", "site_admin", "admin"]] = None, expires_in_days: Optional[int] = None, max_cost_usd_per_call: Optional[float] = None, mode: Optional[Literal["live", "test"]] = None) -> Any:
         """Create an API key. Mints an API key, agency-wide or pinned to one client, with a
@@ -950,16 +989,21 @@ class Tools:
         and changed pages to IndexNow; the first call records the baseline only. A
         Forumulate webhook subscribed to page.live can point at it too: each published
         page is submitted when it goes live and noted on the timeline as a publish.
-        Returns hookId and url (neither is secret), secret (sent as Authorization:
-        Bearer; shown only here), webhookUrl (the secret in the path, only for senders
-        that cannot set a header, such as Netlify, Vercel, Cloudflare Pages and
-        Forumulate; treat that whole URL as a secret, since tools print URLs; it works
-        for as long as the hook does, by design, and pathUrl: false leaves it out of the
-        answer) and howToCall for each platform. A client that already has a hook is
-        refused with hook_exists and nothing changes; rotate_deploy_hook replaces the
-        secret. With ifMissing: true an existing hook is left alone and returned as
-        {created: false} without a secret, so a provisioning script can run it on every
-        deploy safely. Free."""
+        Calls to url carry the secret as Authorization: Bearer, or sign the raw body
+        with it (Seolyticize-Signature: t=<unix>,v1=<hex HMAC-SHA256 of <t>.<body>>, as
+        create_webhook signs, within 5 minutes), or come signed by a Forumulate webhook
+        whose secret was given to set_deploy_hook_sender_secret. A body may carry
+        {release: {ref, source, environment, time}}, the release marker shared with
+        other tools, shown on the timeline note. Returns hookId and url (neither is
+        secret), secret (sent as Authorization: Bearer or used to sign; shown only
+        here), webhookUrl (the secret in the path, only for senders that cannot set a
+        header, such as Netlify, Vercel, Cloudflare Pages and Forumulate; treat that
+        whole URL as a secret, since tools print URLs; it works for as long as the hook
+        does, by design, and pathUrl: false leaves it out of the answer) and howToCall
+        for each platform. A client that already has a hook is refused with hook_exists
+        and nothing changes; rotate_deploy_hook replaces the secret. With ifMissing:
+        true an existing hook is left alone and returned as {created: false} without a
+        secret, so a provisioning script can run it on every deploy safely. Free."""
         return self.call("create_deploy_hook", _present({"clientId": client_id, "sitemapUrl": sitemap_url, "sitemaps": sitemaps, "pathUrl": path_url, "ifMissing": if_missing}))
 
     def create_funnel(self, *, client_id: str, name: str, steps: List[Dict[str, Any]], upsert_by: Optional[Literal["name"]] = None, dry_run: Optional[bool] = None) -> Any:
@@ -1202,7 +1246,7 @@ class Tools:
         in and approves it again. Safe to repeat."""
         return self.call("disconnect_app", _present({"grantId": grant_id}))
 
-    def disconnect_integration(self, *, client_id: str, provider: Literal["stripe", "shopify", "paddle", "google_sheets", "bigquery", "airtable", "slack", "discord", "telegram", "jira", "linear", "github", "matomo"]) -> Any:
+    def disconnect_integration(self, *, client_id: str, provider: Literal["stripe", "shopify", "paddle", "google_sheets", "bigquery", "airtable", "slack", "discord", "telegram", "jira", "linear", "github", "matomo", "external_events"]) -> Any:
         """Disconnect a tool. Removes a connection and its sealed key, with the syncs,
         digests and task links that ran through it. Revoke the key at the provider too.
         Answers 'disconnect their Stripe'. Safe to repeat."""
@@ -1856,7 +1900,16 @@ class Tools:
         the findings that explain why; pass false to see everything. Findings accepted
         as intentional (accept_issue) are taken out of the counts and listed apart in
         accepted, each with its reason; with path owners set (set_path_owners), each
-        issue says how its pages split between owners (owners) and byOwner totals them."""
+        issue says how its pages split between owners (owners) and byOwner totals them.
+        fixes groups the same findings by URL template (the client's analytics
+        pathTemplates, then paths that differ in one segment under a common prefix,
+        /templates/*): one row per rule and template with its pages, an example page and
+        sharedMessage (the message most of its pages share: the template's one cause),
+        the rule's pages that fit no template in one row of their own; issuesFound
+        counts distinct fixes (one per rule and template, plus one per page that fits no
+        template) and findingPages the pages behind them, accepted findings left out of
+        both. A template row over 50 pages carries acceptIssue, the accept_issue call
+        (dryRun) for when those pages are that way on purpose."""
         return self.call("get_audit_summary", _present({"clientId": client_id, "crawlId": crawl_id, "indexableOnly": indexable_only}))
 
     def get_backlink_audit(self, *, client_id: str, money_terms: Optional[List[str]] = None) -> Any:
@@ -2132,12 +2185,12 @@ class Tools:
         return self.call("get_click_curve", _present({"engine": engine, "market": market, "query": query}))
 
     def get_client(self, *, client_id: str) -> Any:
-        """Get a client. One client's settings with its projects, sites and rank trackers
-        (each with its frequency: daily, weekly, monthly or manual, set with
-        update_rank_tracker), whether the paid weekly domain sweep runs (domainSweep,
-        set with set_domain_sweep), and the analytics siteKey and collectUrl (null
-        before set_up_web_analytics). Answers 'what is set up for this client' — use it
-        to find tracker, project and site ids before changing anything."""
+        """Get a client. One client's settings with its domains (client.domains), projects,
+        sites and rank trackers (each with its frequency: daily, weekly, monthly or
+        manual, set with update_rank_tracker), whether the paid weekly domain sweep runs
+        (domainSweep, set with set_domain_sweep), and the analytics siteKey and
+        collectUrl (null before set_up_web_analytics). Answers 'what is set up for this
+        client' — use it to find tracker, project and site ids before changing anything."""
         return self.call("get_client", _present({"clientId": client_id}))
 
     def get_client_brief(self, *, client_id: str) -> Any:
@@ -2341,10 +2394,15 @@ class Tools:
         the hook's createdAt, lastCalledAt (the last call, whatever came of it),
         lastRunAt (the last run that read a sitemap), lastResult (led by the call's
         source and ref in brackets when it sent them), how many sitemap pages it knows,
-        and howToCall.coolify: the post-deploy command, which reads the URL and secret
-        from SEOLYTICIZE_DEPLOY_HOOK_URL and SEOLYTICIZE_DEPLOY_HOOK_SECRET. hookId is
-        not secret. Never the secret itself: a lost one is replaced with
-        rotate_deploy_hook. Free."""
+        url (the address to call; not secret, the value of SEOLYTICIZE_DEPLOY_HOOK_URL),
+        signing (hookSecret: signed calls work; senderSecret: a sender's own secret is
+        set) and howToCall: anyPipeline, signed (the body signed with
+        Seolyticize-Signature, no secret in the URL), coolify (a git build's
+        post-deployment command), prebuiltImage (seolyticize-notify-deploy --wait-for
+        from the deploy script), githubActions, vercel, forumulate and knownPages. Every
+        call belongs after the new version serves; ref is free text. hookId is not
+        secret. Never the secret itself: a lost one is replaced with rotate_deploy_hook.
+        Free."""
         return self.call("get_deploy_hook", _present({"clientId": client_id}))
 
     def get_disavow_history(self, *, client_id: str, limit: Optional[int] = None) -> Any:
@@ -3494,9 +3552,11 @@ class Tools:
         worse in Chrome's field data, a template's Lighthouse performance down 10 points
         or more. Notice: H2 outline changed, page copy changed (body hash). The
         description, og, h2 and body fields compare only crawls that recorded them.
-        fields, severity and template narrow it. Answers 'what did the last release
-        break', 'did a template lose its canonicals' and 'why did these pages drop out'.
-        Free."""
+        fields, severity and template narrow it. deploys lists the deploy notes on the
+        timeline between the two crawls (the deploy hook writes one per call, titled
+        with its source, ref and environment), so each change reads beside the release
+        that shipped it. Answers 'what did the last release break', 'did a template lose
+        its canonicals' and 'why did these pages drop out'. Free."""
         return self.call("get_seo_changes", _present({"clientId": client_id, "crawlId": crawl_id, "againstCrawlId": against_crawl_id, "fields": fields, "severity": severity, "template": template, "limit": limit}))
 
     def get_seo_revenue(self, *, client_id: str, by: Optional[Literal["channel", "landing_page", "query_cluster", "campaign", "source", "ai_referrer", "provider"]] = None, days: Optional[int] = None, limit: Optional[int] = None) -> Any:
@@ -3658,8 +3718,11 @@ class Tools:
     def get_site_status(self, *, client_id: str) -> Any:
         """Site verification and connection status. For a client's sites: whether the
         IndexNow key file has been published and verified, which Search Console
-        properties are connected and syncing, and the latest crawl. Answers 'is this
-        site set up and verified'."""
+        properties are connected and syncing, the latest crawl, and coveredHosts: every
+        host the client's pages are served on (the site's domain, then content platforms
+        linked with link_content_platform), each with whether the analytics counts it,
+        the deploy hook sitemaps read on it and whether the crawl covers it. Answers 'is
+        this site set up and verified' and 'which hosts does Seolyticize watch'."""
         return self.call("get_site_status", _present({"clientId": client_id}))
 
     def get_snippet_targets(self, *, client_id: str, limit: Optional[int] = None, draft: Optional[bool] = None, read_missing: Optional[bool] = None, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
@@ -3862,7 +3925,7 @@ class Tools:
         more searches than the keyword tool'. Free."""
         return self.call("get_volume_calibration", _present({"clientId": client_id}))
 
-    def get_web_analytics_breakdown(self, *, client_id: str, breakdown: Literal["pages", "entry_pages", "exit_pages", "sources", "referrers", "campaigns", "countries", "devices", "browsers", "os", "events", "channels", "ai_sources", "ai_landing_pages", "partners"], days: Optional[float] = None, limit: Optional[int] = None) -> Any:
+    def get_web_analytics_breakdown(self, *, client_id: str, breakdown: Literal["pages", "entry_pages", "exit_pages", "sources", "referrers", "campaigns", "countries", "devices", "browsers", "os", "events", "channels", "ai_sources", "ai_landing_pages", "partners", "props"], days: Optional[float] = None, limit: Optional[int] = None, prop_name: Optional[str] = None) -> Any:
         """Traffic by page, source, campaign, country or device (first-party). Lists the
         top rows of one breakdown from Seolyticize's own web analytics: pages
         (pageviews), entry_pages and exit_pages (visits), sources and referrers (visits;
@@ -3872,23 +3935,37 @@ class Tools:
         Social, Email, Referral, Campaign, Direct), ai_sources (visits from each AI
         assistant: ChatGPT, Perplexity, Gemini, Copilot, Claude, Google AI Mode and
         others), ai_landing_pages (the pages AI assistants send visits to, detail naming
-        the assistant) or partners (pageviews by who served the page: "site" for the
-        site's own, or each partner declared with set_up_web_analytics). Each row has
-        key, visitors and count; counts says what count counts, and totalKeys how many
-        rows exist before the limit. Answers 'which pages and sources drive visits'.
-        Refuses with a sentence when web analytics has not been set up for the client.
-        Free."""
-        return self.call("get_web_analytics_breakdown", _present({"clientId": client_id, "breakdown": breakdown, "days": days, "limit": limit}))
+        the assistant), partners (pageviews by who served the page: "site" for the
+        site's own, or each partner declared with set_up_web_analytics) or props (the
+        values of one custom-event property named in propName, such as "variant", with
+        event counts). Each row has key, visitors and count; counts says what count
+        counts, and totalKeys how many rows exist before the limit. Answers 'which pages
+        and sources drive visits'. Refuses with a sentence when web analytics has not
+        been set up for the client. Free."""
+        return self.call("get_web_analytics_breakdown", _present({"clientId": client_id, "breakdown": breakdown, "days": days, "limit": limit, "propName": prop_name}))
+
+    def get_web_analytics_realtime(self, *, client_id: str) -> Any:
+        """Who is on the site now (first-party). Visitors on the site in the last 5
+        minutes, from Seolyticize's own web analytics, and topPages: the pages they
+        viewed in that time (path, visitors, pageviews), most visitors first. Answers
+        'is anyone on the site right now' and 'did the deploy break tracking'. Refuses
+        with a sentence when web analytics has not been set up for the client. Free."""
+        return self.call("get_web_analytics_realtime", _present({"clientId": client_id}))
 
     def get_web_analytics_setup(self, *, client_id: str) -> Any:
         """Is web analytics installed. Whether Seolyticize's own cookieless web analytics
         is set up for a client, with the one-line tracking snippet to install (it sends
         the page's origin and path and never its query string, except utm_* campaign
-        tags, nor its fragment), the site key, collectUrl for sending events from your
-        own code (get_collect_contract has the fields and limits), the hostnames allowed
-        to report, and lastEventAt (null until the first visit is recorded). Answers 'is
-        the tracking script installed' and 'what snippet do I add to the site'.
-        configured is false when no snippet has been created yet. Free."""
+        tags, nor its fragment), siteKey (the public key the snippet carries as
+        data-site-key or data-site; not the internal site_ id in crawl ids), collectUrl
+        for sending events from your own code (get_collect_contract has the fields and
+        limits), the hostnames allowed to report, includePaths, excludePaths and
+        respectRobots with rules (what the server records and drops, in sentences: the
+        server's settings win over the snippet's data-include and data-exclude), clients
+        (the newest version of each Seolyticize package seen reporting), and lastEventAt
+        (null until the first visit is recorded). Answers 'is the tracking script
+        installed' and 'what snippet do I add to the site'. configured is false when no
+        snippet has been created yet. Free."""
         return self.call("get_web_analytics_setup", _present({"clientId": client_id}))
 
     def get_web_analytics_summary(self, *, client_id: str, days: Optional[float] = None) -> Any:
@@ -3896,10 +3973,12 @@ class Tools:
         visit, bounce rate and average visit duration from Seolyticize's own web
         analytics, against the same span before (previous is null when that span was not
         fully measured), plus a daily series, realtimeVisitors in the last 30 minutes,
-        and notes on how figures are counted. Answers 'how much traffic did the site
-        get' for a client without GA4. Visitors are counted per day without cookies; a
-        figure of null means not measured, not zero. Refuses with a sentence when web
-        analytics has not been set up for the client. Free."""
+        and notes on how figures are counted. Days before the site's own first event
+        that were imported with import_analytics_csv are filled in the daily series
+        (imported: true) and totalled in imported, never added to summary. Answers 'how
+        much traffic did the site get' for a client without GA4. Visitors are counted
+        per day without cookies; a figure of null means not measured, not zero. Refuses
+        with a sentence when web analytics has not been set up for the client. Free."""
         return self.call("get_web_analytics_summary", _present({"clientId": client_id, "days": days}))
 
     def get_written_report(self, *, client_id: str, report_id: str) -> Any:
@@ -3981,6 +4060,18 @@ class Tools:
         much demand is the AI Overview eating' and 'which keywords are worth less than
         their volume says'. Free."""
         return self.call("get_zero_click_estimates", _present({"clientId": client_id, "days": days, "limit": limit}))
+
+    def import_analytics_csv(self, *, client_id: str, source: Literal["plausible", "umami"], csv: str, dry_run: Optional[bool] = None) -> Any:
+        """Import visits from Plausible or Umami. Imports daily visitors, visits and
+        pageviews from another analytics tool's CSV export, so the months before
+        Seolyticize's tag was installed are not empty: Plausible's imported_visitors.csv
+        (or visitors.csv) from its export zip, or Umami's website_event.csv (counted per
+        day) or a daily table with date, visitors and pageviews. Only daily totals are
+        imported, not pages or sources. Imported days show in get_web_analytics_summary
+        only before the site's own first event; importing a day again replaces it.
+        Answers with the days, range and totals read and the lines skipped. Refuses with
+        a sentence when web analytics has not been set up for the client. Free."""
+        return self.call("import_analytics_csv", _present({"clientId": client_id, "source": source, "csv": csv, "dryRun": dry_run}))
 
     def import_client_facts(self, *, client_id: str, url: Optional[str] = None, content: Optional[str] = None, dry_run: Optional[bool] = None) -> Any:
         """Import the client's facts from a manifest. Reads a facts manifest the site's
@@ -4083,6 +4174,29 @@ class Tools:
         max_cost_micros to cap it."""
         return self.call("keyword_traffic_potential", _present({"clientId": client_id, "term": term, "locationCode": location_code, "languageCode": language_code, "refresh": refresh, "maxCostMicros": max_cost_micros, "dryRun": dry_run}))
 
+    def link_content_platform(self, *, client_id: str, kind: Literal["forumulate", "other"], host: str, sitemap_url: Optional[str] = None) -> Any:
+        """Link a content platform's host. Answers 'our help, blog or legal pages live on
+        another host (Forumulate, a docs platform)'. Links a host serving the client's
+        pages to the client: adds it to the cookieless analytics hostnames (a visit from
+        a host not listed is refused), and adds its sitemap (sitemapUrl, else each
+        Sitemap: line of the host's robots.txt, else /sitemap.xml, kept only when it
+        answers as a sitemap) to the deploy hook's sitemaps, keeping the hook's secret
+        and baseline, so each call reads its new and changed pages and submits them to
+        IndexNow (which accepts them only when the IndexNow key file is also served on
+        that host). get_site_status lists it under coveredHosts and get_next_steps under
+        content_platform. The site crawl does not follow it: a crawl stays on the
+        client's own domain. On the Forumulate side (from its public guides): set the
+        site key from get_web_analytics_setup as the seolyticize field of PUT
+        /orgs/{orgId}/analytics-tags (or a site's or space's), which sends pageviews
+        with no script, gated as first-party measurement by the consent settings
+        (firstPartyAnalytics); robots.txt names the host's sitemap; and a webhook of
+        kind deploy_hook (events page.published or page.live) pointed at
+        create_deploy_hook's webhookUrl calls the hook after each publish with
+        ?source=forumulate&ref=<event>, which get_deploy_hook's lastResult shows.
+        Forumulate's deploy_hook sends no header, so it needs the webhookUrl holding the
+        secret. Safe to repeat. Free."""
+        return self.call("link_content_platform", _present({"clientId": client_id, "kind": kind, "host": host, "sitemapUrl": sitemap_url}))
+
     def list_accepted_issues(self, *, client_id: str, include_lapsed: Optional[bool] = None) -> Any:
         """List the issues accepted as intentional. The client's accepted audit findings:
         rule, template or addresses, the reason, until and who accepted it.
@@ -4130,6 +4244,17 @@ class Tools:
         site is onboarded already."""
         return self.call("list_clients", _present({"domain": domain}))
 
+    def list_collect_keys(self, *, client_id: str) -> Any:
+        """Server collect keys and their last use. The client's server collect keys, never
+        the keys themselves: the active one and the one the last
+        issue_server_collect_key replaced, each with id (the first 12 hex characters of
+        its SHA-256), status (active or revoked), createdAt, revokedAt and lastUsedAt
+        (to about a minute). A revoked key is refused, but each refused use is still
+        recorded, so a rotation is confirmed when the active key's lastUsedAt moves and
+        the revoked one's stops. Answers 'is the old collect key still in use somewhere'
+        and 'did the new key reach production'. Free."""
+        return self.call("list_collect_keys", _present({"clientId": client_id}))
+
     def list_connected_apps(self) -> Any:
         """List connected apps. Assistants and agent apps connected to the agency by
         signing in (MCP OAuth) rather than with an API key: which app, the role and
@@ -4159,7 +4284,16 @@ class Tools:
         'latest' for the newest completed crawl. indexableOnly (default true) leaves out
         findings on pages search engines will not index as themselves — noindexed, not
         answering 200, or canonicalised elsewhere — except the findings that explain
-        why; pass false to see everything."""
+        why; pass false to see everything. fixes groups the same findings by URL
+        template (the client's analytics pathTemplates, then paths that differ in one
+        segment under a common prefix, /templates/*): one row per rule and template with
+        its pages, an example page and sharedMessage (the message most of its pages
+        share: the template's one cause), the rule's pages that fit no template in one
+        row of their own; issuesFound counts distinct fixes (one per rule and template,
+        plus one per page that fits no template) and findingPages the pages behind them,
+        accepted findings left out of both. A template row over 50 pages carries
+        acceptIssue, the accept_issue call (dryRun) for when those pages are that way on
+        purpose."""
         return self.call("list_crawl_issues", _present({"clientId": client_id, "crawlId": crawl_id, "indexableOnly": indexable_only}))
 
     def list_crawls(self, *, client_id: str, limit: Optional[int] = None) -> Any:
@@ -4177,6 +4311,13 @@ class Tools:
         """List digest schedules. Lists where and when the client's weekly digest is
         posted, and when it last went. Free."""
         return self.call("list_digest_schedules", _present({"clientId": client_id}))
+
+    def list_external_event_senders(self, *, client_id: str) -> Any:
+        """Senders of signed goal events. The client's connect_external_events senders,
+        each with name and events (its event type → goal event name), and the webhookUrl
+        they all post to; never a secret. null webhookUrl and no senders when none is
+        connected. Answers 'which systems send us sign-ups'. Free."""
+        return self.call("list_external_event_senders", _present({"clientId": client_id}))
 
     def list_funnels(self, *, client_id: str) -> Any:
         """List funnels. Lists the funnels defined for a client, with their steps. Free."""
@@ -4424,13 +4565,21 @@ class Tools:
     def move_site(self, *, client_id: str, new_domain: str, verification: Optional[Literal["file", "meta", "dns"]] = None, overlap_days: Optional[int] = None) -> Any:
         """Move a client to a new domain. Answers 'the site moved to a new domain'. Keeps
         the client, its history and its analytics site key, and moves everything that
-        follows the domain: the site and its rank trackers, the analytics hostnames (the
-        old ones are still accepted for overlapDays, then refused), and the deploy hook
-        (same URL; its next call records a fresh baseline). Issues a Google verification
-        for the new domain and returns the deploy manifest to put on it (IndexNow key
-        file, verification file, tag or TXT record), and adds a 'Domain moved' note to
-        the timeline. Then deploy the manifest on the new domain and call verify_site,
-        which verifies it and adds the new Search Console property. Free."""
+        follows the domain: the site, its rank trackers (frequency unchanged), its own
+        brand in AI visibility, the IndexNow key, the analytics hostnames (the old ones
+        are still accepted for overlapDays, then refused), and the deploy hook (same
+        URL; sitemaps on the old domain follow, others are listed in otherHosts; its
+        next call records a fresh baseline). Never changes the budget or the domain
+        sweep. notMoved names what cannot follow, with the next step. Safe to repeat: a
+        second call answers alreadyMoved: true with the same manifest and changes
+        nothing. Issues a Google verification for the new domain and returns the deploy
+        manifest to put on it (IndexNow key file, verification file, tag or TXT record),
+        and adds a 'Domain moved' note to the timeline. When the new domain already
+        proves ownership (a DNS TXT record added beforehand), it connects the new Search
+        Console property at once, as a Domain property; searchConsoleProperty says
+        which, or names verify_site. Otherwise deploy the manifest on the new domain and
+        call verify_site, which verifies it and adds the property. The order of every
+        step: https://seolyticize.com/docs/move-a-site. Free."""
         return self.call("move_site", _present({"clientId": client_id, "newDomain": new_domain, "verification": verification, "overlapDays": overlap_days}))
 
     def notify_google_indexing(self, *, client_id: str, urls: List[str], type_: Optional[Literal["URL_UPDATED", "URL_DELETED"]] = None, dry_run: Optional[bool] = None) -> Any:
@@ -4705,6 +4854,14 @@ class Tools:
         tracker's remaining competitors. Naming a domain that is not on the list is not
         an error."""
         return self.call("remove_competitors", _present({"clientId": client_id, "trackerId": tracker_id, "domains": domains}))
+
+    def remove_external_event_sender(self, *, client_id: str, sender: str) -> Any:
+        """Stop one sender of signed goal events. Drops one connect_external_events sender:
+        its deliveries are refused from now on, and the client's other senders keep
+        working at the same webhookUrl. removed false when there is no sender of that
+        name. Removing the last one removes the connection. Answers 'stop counting
+        sign-ups from Clerk'. Free."""
+        return self.call("remove_external_event_sender", _present({"clientId": client_id, "sender": sender}))
 
     def remove_keyword_owners(self, *, client_id: str, keywords: List[str]) -> Any:
         """Release keywords from the registry. Removes the registry's claims on the given
@@ -5208,6 +5365,17 @@ class Tools:
         way'. Free."""
         return self.call("set_crawl_settings", _present({"clientId": client_id, "stripParams": strip_params, "extractions": extractions, "render": render, "renderMaxPages": render_max_pages, "mode": mode, "listUrls": list_urls, "includePatterns": include_patterns, "excludePatterns": exclude_patterns, "userAgent": user_agent, "requestsPerSecond": requests_per_second, "concurrency": concurrency, "maxDepth": max_depth, "maxPages": max_pages, "dryRun": dry_run}))
 
+    def set_deploy_hook_sender_secret(self, *, client_id: str, sender_secret: Optional[str]) -> Any:
+        """Let a sender sign deploy hook calls with its own secret. Answers 'Forumulate
+        signs its webhooks, let it call the deploy hook without a secret in the URL'.
+        Stores a sender's own signing secret (a Forumulate webhook's whsec_…, answered
+        once when the webhook is made) on the client's deploy hook, sealed. A call to
+        the hook's url signed with it (X-Forumulate-Signature v1 over
+        X-Forumulate-Timestamp, within 5 minutes) is then accepted, beside the hook's
+        own secret. null forgets it. The hook's own secret is untouched. Never returned.
+        Free."""
+        return self.call("set_deploy_hook_sender_secret", _present({"clientId": client_id, "senderSecret": sender_secret}))
+
     def set_domain_sweep(self, *, client_id: str, enabled: bool) -> Any:
         """Turn the weekly domain refresh on or off. Turns the Sunday 01:00 UTC domain
         sweep on or off for one client: the weekly paid refresh of its domain overview,
@@ -5272,7 +5440,7 @@ class Tools:
         carries a preview card for Slack, email and social networks. Free."""
         return self.call("set_report_sharing", _present({"clientId": client_id, "reportId": report_id, "shared": shared}))
 
-    def set_up_web_analytics(self, *, client_id: str, hostnames: Optional[List[str]] = None, exclude_paths: Optional[List[str]] = None, include_paths: Optional[List[str]] = None, path_templates: Optional[List[str]] = None, partners: Optional[List[Dict[str, Any]]] = None) -> Any:
+    def set_up_web_analytics(self, *, client_id: str, hostnames: Optional[List[str]] = None, exclude_paths: Optional[List[str]] = None, include_paths: Optional[List[str]] = None, path_templates: Optional[List[str]] = None, partners: Optional[List[Dict[str, Any]]] = None, respect_robots: Optional[bool] = None) -> Any:
         """Set up web analytics. Creates a client's cookieless web analytics, or changes
         which hostnames may report to it, and returns the same shape as
         get_web_analytics_setup: the one-line tracking snippet to add to every page, the
@@ -5282,7 +5450,7 @@ class Tools:
         ignored, so add staging or extra domains here). Safe to repeat: an existing
         setup keeps its snippet. configured is false when the client has no site domain
         to default to and no hostnames were given. Free."""
-        return self.call("set_up_web_analytics", _present({"clientId": client_id, "hostnames": hostnames, "excludePaths": exclude_paths, "includePaths": include_paths, "pathTemplates": path_templates, "partners": partners}))
+        return self.call("set_up_web_analytics", _present({"clientId": client_id, "hostnames": hostnames, "excludePaths": exclude_paths, "includePaths": include_paths, "pathTemplates": path_templates, "partners": partners, "respectRobots": respect_robots}))
 
     def simulate_serp_snippet(self, *, client_id: Optional[str] = None, url: Optional[str] = None, title: Optional[str] = None, description: Optional[str] = None) -> Any:
         """How a result will look. Shows a page's title and meta description as Google's
@@ -5514,22 +5682,24 @@ class Tools:
         Free."""
         return self.call("unaccept_issue", _present({"clientId": client_id, "ids": ids}))
 
-    def update_alert_rule(self, *, client_id: str, rule_id: str, threshold: Optional[int] = None, cooldown_hours: Optional[int] = None, webhook_url: Optional[str] = None, channel: Optional[Literal["slack", "webhook", "discord", "email", "telegram"]] = None, email_recipients: Optional[List[str]] = None, telegram_chat_id: Optional[str] = None, paused: Optional[bool] = None, paid_source: Optional[bool] = None) -> Any:
+    def update_alert_rule(self, *, client_id: str, rule_id: str, threshold: Optional[int] = None, cooldown_hours: Optional[int] = None, webhook_url: Optional[str] = None, channel: Optional[Literal["slack", "webhook", "discord", "email", "telegram", "watchtower", "hermetica"]] = None, email_recipients: Optional[List[str]] = None, telegram_chat_id: Optional[str] = None, api_key: Optional[str] = None, watchtower_project_id: Optional[str] = None, hermetica_from: Optional[str] = None, paused: Optional[bool] = None, paid_source: Optional[bool] = None) -> Any:
         """Update an alert rule. Changes a rule's threshold, cooldown or delivery (channel,
-        webhookUrl — null removes it — emailRecipients, telegramChatId), or pauses and
-        resumes it, or turns its paidSource on or off. Answers 'this alert is too
-        noisy', 'send this to email instead' or 'mute this for now'. Pausing keeps the
-        rule's history. paidSource (competitor-new-keywords and web-mentions only; off
-        by default; needs spend permission) also buys the signal from DataForSEO on
-        every sweep: for competitor-new-keywords, Labs ranked keywords each tracker
-        competitor (up to 5) newly ranks for at the tracker's market, not only tracked
-        keywords; for web-mentions, pages DataForSEO's content index first saw naming
-        the brand, off the client's own domains. The sweep is hourly but a purchase is
-        reused from the archive while fresh, so it buys at most once a week per
-        competitor (once a day for mentions); it is capped by the client's monthly
-        budget, and a failed or over-budget read falls back to the free signal. Quote it
-        first with estimate_cost."""
-        return self.call("update_alert_rule", _present({"clientId": client_id, "ruleId": rule_id, "threshold": threshold, "cooldownHours": cooldown_hours, "webhookUrl": webhook_url, "channel": channel, "emailRecipients": email_recipients, "telegramChatId": telegram_chat_id, "paused": paused, "paidSource": paid_source}))
+        webhookUrl — null removes it — emailRecipients, telegramChatId, apiKey,
+        watchtowerProjectId, hermeticaFrom), or pauses and resumes it, or turns its
+        paidSource on or off. Answers 'this alert is too noisy', 'send this to email
+        instead' or 'mute this for now' (pause the site-unreachable rule when another
+        monitor owns uptime). Pausing keeps the rule's history. paidSource
+        (competitor-new-keywords and web-mentions only; off by default; needs spend
+        permission) also buys the signal from DataForSEO on every sweep: for
+        competitor-new-keywords, Labs ranked keywords each tracker competitor (up to 5)
+        newly ranks for at the tracker's market, not only tracked keywords; for
+        web-mentions, pages DataForSEO's content index first saw naming the brand, off
+        the client's own domains. The sweep is hourly but a purchase is reused from the
+        archive while fresh, so it buys at most once a week per competitor (once a day
+        for mentions); it is capped by the client's monthly budget, and a failed or
+        over-budget read falls back to the free signal. Quote it first with
+        estimate_cost."""
+        return self.call("update_alert_rule", _present({"clientId": client_id, "ruleId": rule_id, "threshold": threshold, "cooldownHours": cooldown_hours, "webhookUrl": webhook_url, "channel": channel, "emailRecipients": email_recipients, "telegramChatId": telegram_chat_id, "apiKey": api_key, "watchtowerProjectId": watchtower_project_id, "hermeticaFrom": hermetica_from, "paused": paused, "paidSource": paid_source}))
 
     def update_business_profile(self, *, client_id: str, changes: Dict[str, Any], location_id: Optional[str] = None, dry_run: Optional[bool] = None) -> Any:
         """Change a Google Business Profile listing. Changes the client's own Google

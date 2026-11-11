@@ -1,6 +1,6 @@
 # Seolyticize for Python
 
-Every [Seolyticize](https://seolyticize.com) API tool (about 500 in 0.5.2) as a method, and on-site helpers for analytics, IndexNow and deploys. Standard library only, Python 3.9+.
+Every [Seolyticize](https://seolyticize.com) API tool (517 in 0.5.3) as a method, and on-site helpers for analytics, IndexNow and deploys. Standard library only, Python 3.9+.
 
 ```sh
 pip install seolyticize
