@@ -997,13 +997,14 @@ class Tools:
         other tools, shown on the timeline note. Returns hookId and url (neither is
         secret), secret (sent as Authorization: Bearer or used to sign; shown only
         here), webhookUrl (the secret in the path, only for senders that cannot set a
-        header, such as Netlify, Vercel, Cloudflare Pages and Forumulate; treat that
-        whole URL as a secret, since tools print URLs; it works for as long as the hook
-        does, by design, and pathUrl: false leaves it out of the answer) and howToCall
-        for each platform. A client that already has a hook is refused with hook_exists
-        and nothing changes; rotate_deploy_hook replaces the secret. With ifMissing:
-        true an existing hook is left alone and returned as {created: false} without a
-        secret, so a provisioning script can run it on every deploy safely. Free."""
+        header or sign, such as Netlify, Vercel, Cloudflare Pages and Forumulate's
+        deploy_hook kind; treat that whole URL as a secret, since tools print URLs; it
+        works for as long as the hook does, by design, and pathUrl: false leaves it out
+        of the answer) and howToCall for each platform. A client that already has a hook
+        is refused with hook_exists and nothing changes; rotate_deploy_hook replaces the
+        secret. With ifMissing: true an existing hook is left alone and returned as
+        {created: false} without a secret, so a provisioning script can run it on every
+        deploy safely. Free."""
         return self.call("create_deploy_hook", _present({"clientId": client_id, "sitemapUrl": sitemap_url, "sitemaps": sitemaps, "pathUrl": path_url, "ifMissing": if_missing}))
 
     def create_funnel(self, *, client_id: str, name: str, steps: List[Dict[str, Any]], upsert_by: Optional[Literal["name"]] = None, dry_run: Optional[bool] = None) -> Any:
@@ -2020,7 +2021,9 @@ class Tools:
         checkout for a plan (studio, agency or network), or — with no plan, for an
         agency already paying — the portal where cards, invoices and cancellation live.
         Answers 'upgrade our plan'. An agent cannot pay; hand the address to a person.
-        Refused where this deployment has no billing set up."""
+        The plan pays for Seolyticize, never for vendor data: a DataForSEO balance is
+        topped up in the agency's own DataForSEO account (get_next_steps' vendor_balance
+        item). Refused where this deployment has no billing set up."""
         return self.call("get_billing_link", _present({"plan": plan}))
 
     def get_bing_crawl_health(self, *, client_id: str, limit: Optional[int] = None) -> Any:
@@ -3108,7 +3111,9 @@ class Tools:
         """What to do next for a site. The doctor call. Answers 'what is left to do for
         this site, and what call does it' and 'what is not connected for this client,
         and what does each missing piece block'. missing lists the ids of every item not
-        done. The onboarding checklist with live status — done, todo, in progress,
+        done. ready is true once the required items are done (set up); health is
+        degraded, with blocked naming the items, while anything is blocked, even with
+        ready true. The onboarding checklist with live status — done, todo, in progress,
         failed or blocked and why — each with the exact tool and arguments to call next;
         then the optional connections that unlock more tools (Bing Webmaster key,
         PageSpeed / Chrome UX Report key, alert delivery, rank tracker keywords, AI
@@ -4189,12 +4194,19 @@ class Tools:
         site key from get_web_analytics_setup as the seolyticize field of PUT
         /orgs/{orgId}/analytics-tags (or a site's or space's), which sends pageviews
         with no script, gated as first-party measurement by the consent settings
-        (firstPartyAnalytics); robots.txt names the host's sitemap; and a webhook of
-        kind deploy_hook (events page.published or page.live) pointed at
-        create_deploy_hook's webhookUrl calls the hook after each publish with
-        ?source=forumulate&ref=<event>, which get_deploy_hook's lastResult shows.
-        Forumulate's deploy_hook sends no header, so it needs the webhookUrl holding the
-        secret. Safe to repeat. Free."""
+        (firstPartyAnalytics); robots.txt names the host's sitemap; and publishes call
+        the deploy hook one of three ways, as get_deploy_hook's howToCall.forumulate
+        spells out: (1, recommended) an ordinary signed webhook, POST
+        /orgs/{orgId}/webhooks {url: the hook's url, events: [page.live,
+        publish.completed]}, whose one-time signing secret goes to
+        set_deploy_hook_sender_secret, so no secret is in any URL; (2) Settings →
+        Analytics, PUT /orgs/{orgId}/seolyticize/deploy-hook {url: webhookUrl}, the same
+        webhook with a secret it never answers; (3) a webhook of kind deploy_hook (a
+        manifest's webhooks entry {kind: deploy_hook, url: webhookUrl, events:
+        [page.published]}; page.live and topic.published also allowed, publish.completed
+        not), an unsigned empty POST with ?source=forumulate&ref=<event>, which
+        get_deploy_hook's lastResult shows. (2) and (3) carry no signature Seolyticize
+        can check, so they need the webhookUrl holding the secret. Safe to repeat. Free."""
         return self.call("link_content_platform", _present({"clientId": client_id, "kind": kind, "host": host, "sitemapUrl": sitemap_url}))
 
     def list_accepted_issues(self, *, client_id: str, include_lapsed: Optional[bool] = None) -> Any:
@@ -4248,11 +4260,14 @@ class Tools:
         """Server collect keys and their last use. The client's server collect keys, never
         the keys themselves: the active one and the one the last
         issue_server_collect_key replaced, each with id (the first 12 hex characters of
-        its SHA-256), status (active or revoked), createdAt, revokedAt and lastUsedAt
-        (to about a minute). A revoked key is refused, but each refused use is still
-        recorded, so a rotation is confirmed when the active key's lastUsedAt moves and
-        the revoked one's stops. Answers 'is the old collect key still in use somewhere'
-        and 'did the new key reach production'. Free."""
+        its SHA-256), status (active or revoked), createdAt, revokedAt, lastUsedAt (to
+        about a minute) and note (why createdAt or lastUsedAt is null: dates and use are
+        kept from 2026-11-11, and an older key is dated from its
+        issue_server_collect_key call when one is on record). A revoked key is refused,
+        but each refused use is still recorded, so a rotation is confirmed when the
+        active key's lastUsedAt moves and the revoked one's stops. Answers 'is the old
+        collect key still in use somewhere' and 'did the new key reach production'.
+        Free."""
         return self.call("list_collect_keys", _present({"clientId": client_id}))
 
     def list_connected_apps(self) -> Any:
@@ -5368,12 +5383,14 @@ class Tools:
     def set_deploy_hook_sender_secret(self, *, client_id: str, sender_secret: Optional[str]) -> Any:
         """Let a sender sign deploy hook calls with its own secret. Answers 'Forumulate
         signs its webhooks, let it call the deploy hook without a secret in the URL'.
-        Stores a sender's own signing secret (a Forumulate webhook's whsec_…, answered
-        once when the webhook is made) on the client's deploy hook, sealed. A call to
-        the hook's url signed with it (X-Forumulate-Signature v1 over
-        X-Forumulate-Timestamp, within 5 minutes) is then accepted, beside the hook's
-        own secret. null forgets it. The hook's own secret is untouched. Never returned.
-        Free."""
+        Stores a sender's own signing secret (the secret, whsec_… or
+        forumulate_live_whsec_…, that Forumulate's POST /orgs/{orgId}/webhooks answers
+        once for an ordinary webhook of kind webhook; its deploy_hook kind and its
+        Settings → Analytics hook have none to give, and take webhookUrl instead) on the
+        client's deploy hook, sealed. A call to the hook's url signed with it
+        (X-Forumulate-Signature v1 over X-Forumulate-Timestamp, within 5 minutes) is
+        then accepted, beside the hook's own secret. null forgets it. The hook's own
+        secret is untouched. Never returned. Free."""
         return self.call("set_deploy_hook_sender_secret", _present({"clientId": client_id, "senderSecret": sender_secret}))
 
     def set_domain_sweep(self, *, client_id: str, enabled: bool) -> Any:
