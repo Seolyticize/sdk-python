@@ -809,7 +809,8 @@ class Tools:
         host for self-hosted, with /api left off. The last 30 days are imported straight
         away; tools that only give totals (Plausible, Fathom) use import_analytics_csv.
         Needs set_up_web_analytics first. Don't also run our tag on the same pages, or
-        visits count twice. Free."""
+        visits count twice. Answers 'use our PostHog for traffic' or 'we measure with
+        Datadog, not your tag'. Free."""
         return self.call("connect_analytics_source", _present({"clientId": client_id, "provider": provider, "project": project, "key": key, "appKey": app_key, "host": host}))
 
     def connect_external_events(self, *, client_id: str, sender: str, sender_secret: Optional[str] = None, events: Optional[Dict[str, Any]] = None) -> Any:
@@ -4213,15 +4214,15 @@ class Tools:
         and baseline, so each call reads its new and changed pages. They are not sent to
         IndexNow, which takes a page only under a key file on the page's own host, which
         only the platform can serve; the hook's answer counts them under
-        notSentToIndexNow with that reason (Forumulate pings for its own blog, changelog
-        and careers spaces with IndexNow on; a docs space has no key). Search engines
-        still read the host's sitemap. get_site_status lists it under coveredHosts and
-        get_next_steps under content_platform. The site crawl does not follow it: a
-        crawl stays on the client's own domain. On the Forumulate side (from its public
-        guides): set the site key from get_web_analytics_setup as the seolyticize field
-        of PUT /orgs/{orgId}/analytics-tags (or a site's or space's), which sends
-        pageviews with no script, gated as first-party measurement by the consent
-        settings (firstPartyAnalytics); robots.txt names the host's sitemap; and
+        notSentToIndexNow with that reason (Forumulate pings IndexNow itself for any of
+        its spaces, docs and help included, once publishPings.indexNow is on there).
+        Search engines still read the host's sitemap. get_site_status lists it under
+        coveredHosts and get_next_steps under content_platform. The site crawl does not
+        follow it: a crawl stays on the client's own domain. On the Forumulate side
+        (from its public guides): set the site key from get_web_analytics_setup as the
+        seolyticize field of PUT /orgs/{orgId}/analytics-tags (or a site's or space's),
+        which sends pageviews with no script, gated as first-party measurement by the
+        consent settings (firstPartyAnalytics); robots.txt names the host's sitemap; and
         publishes call the deploy hook one of three ways, as get_deploy_hook's
         howToCall.forumulate spells out: (1, recommended) an ordinary signed webhook,
         POST /orgs/{orgId}/webhooks {url: the hook's url, events: [page.live,
@@ -4290,11 +4291,16 @@ class Tools:
         its SHA-256), status (active or revoked), createdAt, revokedAt, lastUsedAt (to
         about a minute) and note (why createdAt or lastUsedAt is null: dates and use are
         kept from 2026-11-11, and an older key is dated from its
-        issue_server_collect_key call when one is on record). A revoked key is refused,
-        but each refused use is still recorded, so a rotation is confirmed when the
-        active key's lastUsedAt moves and the revoked one's stops. Answers 'is the old
-        collect key still in use somewhere' and 'did the new key reach production'.
-        Free."""
+        issue_server_collect_key call when one is on record). Use is a POST to
+        /api/collect with Authorization: Bearer <key> (createCollector or
+        expressCollector from @seolyticize/next/server, the Python or PHP Collector, or
+        your own server); a.js, the browser components and the REST API never send it. A
+        revoked key is refused, but each refused use is still recorded, so a rotation is
+        confirmed when the active key's lastUsedAt moves and the revoked one's stops.
+        unknownKey ({id, lastRefusedAt}, or null) is the last call refused for a key
+        that was never this site's: compare its id with the SHA-256 of the key your
+        server holds. Answers 'is the old collect key still in use somewhere' and 'did
+        the new key reach production'. Free."""
         return self.call("list_collect_keys", _present({"clientId": client_id}))
 
     def list_connected_apps(self) -> Any:
@@ -5404,7 +5410,9 @@ class Tools:
         group), jsonld ('Article.datePublished') or meta (a name or property) — see
         get_extraction_results. render runs JavaScript: off, shells (pages that look
         unrendered) or all, capped at renderMaxPages. Answers 'crawl this site this
-        way'. Free."""
+        way'. dryRun: true shows the current settings and, when includePatterns or
+        excludePatterns are given, tries each against the live sitemap:
+        patternCheck.matchNothing lists those that match no page. Free."""
         return self.call("set_crawl_settings", _present({"clientId": client_id, "stripParams": strip_params, "extractions": extractions, "render": render, "renderMaxPages": render_max_pages, "mode": mode, "listUrls": list_urls, "includePatterns": include_patterns, "excludePatterns": exclude_patterns, "userAgent": user_agent, "requestsPerSecond": requests_per_second, "concurrency": concurrency, "maxDepth": max_depth, "maxPages": max_pages, "dryRun": dry_run}))
 
     def set_deploy_hook_sender_secret(self, *, client_id: str, sender_secret: Optional[str]) -> Any:
