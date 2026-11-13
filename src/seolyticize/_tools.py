@@ -263,7 +263,7 @@ READ_ONLY_TOOLS = frozenset({
     "whoami",
 })
 
-TOOL_COUNT = 519
+TOOL_COUNT = 521
 
 
 def _present(values: Dict[str, Any]) -> Dict[str, Any]:
@@ -795,6 +795,23 @@ class Tools:
         needs project:manage."""
         return self.call("compare_sites", _present({"clientId": client_id, "a": a, "b": b, "paths": paths, "maxPages": max_pages, "sendCrawlAuthTo": send_crawl_auth_to, "followRedirect": follow_redirect}))
 
+    def connect_analytics_source(self, *, client_id: str, provider: Literal["posthog", "lucida", "datadog", "umami"], project: str, key: str, app_key: Optional[str] = None, host: Optional[str] = None) -> Any:
+        """Use PostHog, Lucida, Datadog RUM or Umami as the traffic source. Reads the
+        client's pageviews and custom events from the analytics tool the site already
+        runs, every hour, so the traffic, goal, funnel and revenue reports work without
+        our tag. PostHog: project (the project id) and key (a personal API key with
+        Query Read); host https://eu.posthog.com for EU Cloud or a self-hosted address.
+        Lucida: project (the project id) and key (a project secret or account key with
+        insight:read); host for your own Lucida. Datadog: project (the RUM application
+        id) and key (a personal or service access token with rum_apps_read), or key (an
+        API key) with appKey (an application key); host the site's API host, like
+        https://api.datadoghq.eu. Umami: project (the website id) and key (an API key);
+        host for self-hosted, with /api left off. The last 30 days are imported straight
+        away; tools that only give totals (Plausible, Fathom) use import_analytics_csv.
+        Needs set_up_web_analytics first. Don't also run our tag on the same pages, or
+        visits count twice. Free."""
+        return self.call("connect_analytics_source", _present({"clientId": client_id, "provider": provider, "project": project, "key": key, "appKey": app_key, "host": host}))
+
     def connect_external_events(self, *, client_id: str, sender: str, sender_secret: Optional[str] = None, events: Optional[Dict[str, Any]] = None) -> Any:
         """Count sign-ups from your auth or billing system as goals. Makes a system that
         signs its webhooks (an auth provider, a billing system, your own backend) a
@@ -1247,7 +1264,7 @@ class Tools:
         in and approves it again. Safe to repeat."""
         return self.call("disconnect_app", _present({"grantId": grant_id}))
 
-    def disconnect_integration(self, *, client_id: str, provider: Literal["stripe", "shopify", "paddle", "google_sheets", "bigquery", "airtable", "slack", "discord", "telegram", "jira", "linear", "github", "matomo", "external_events"]) -> Any:
+    def disconnect_integration(self, *, client_id: str, provider: Literal["stripe", "shopify", "paddle", "google_sheets", "bigquery", "airtable", "slack", "discord", "telegram", "jira", "linear", "github", "matomo", "external_events", "posthog", "lucida", "datadog", "umami"]) -> Any:
         """Disconnect a tool. Removes a connection and its sealed key, with the syncs,
         digests and task links that ran through it. Revoke the key at the provider too.
         Answers 'disconnect their Stripe'. Safe to repeat."""
@@ -4077,6 +4094,13 @@ class Tools:
         Answers with the days, range and totals read and the lines skipped. Refuses with
         a sentence when web analytics has not been set up for the client. Free."""
         return self.call("import_analytics_csv", _present({"clientId": client_id, "source": source, "csv": csv, "dryRun": dry_run}))
+
+    def import_analytics_now(self, *, client_id: str) -> Any:
+        """Import from the connected analytics tool now. Imports the pageviews and events
+        the connected analytics tool (connect_analytics_source) recorded since the last
+        import; the hourly import does this on its own. Answers 'pull in today's PostHog
+        traffic'. Free."""
+        return self.call("import_analytics_now", _present({"clientId": client_id}))
 
     def import_client_facts(self, *, client_id: str, url: Optional[str] = None, content: Optional[str] = None, dry_run: Optional[bool] = None) -> Any:
         """Import the client's facts from a manifest. Reads a facts manifest the site's
