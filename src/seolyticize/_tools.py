@@ -263,7 +263,7 @@ READ_ONLY_TOOLS = frozenset({
     "whoami",
 })
 
-TOOL_COUNT = 521
+TOOL_COUNT = 523
 
 
 def _present(values: Dict[str, Any]) -> Dict[str, Any]:
@@ -932,18 +932,19 @@ class Tools:
         something to compare. Channels: slack (webhookUrl, Slack's format; the default),
         webhook (webhookUrl, plain JSON), discord (webhookUrl, the channel's Discord
         webhook as Discord shows it), email (emailRecipients, up to ten) telegram
-        (telegramChatId, with the agency's bot from Settings), watchtower (apiKey and
-        watchtowerProjectId: posts an event to that Watchtower project with POST
-        /v1/projects/{prj}/events, alert_type error, warning or info by severity, source
-        seolyticize, aggregation_key the rule id, tags kind:<kind> and
-        client:<clientId>, and the detail and links in its text) or hermetica (apiKey,
-        hermeticaFrom and emailRecipients: the alert email sent through the client's own
-        Hermetica account with POST /v1/transactional/send). The apiKey is stored sealed
-        and never returned. Webhooks must be https and public. With no channel and no
-        destination, the alert goes to the agency owner's email and deliveryNote says
-        so; a channel named without its field is refused as no_delivery_target.
-        paidSource (competitor-new-keywords and web-mentions only; off by default; needs
-        spend permission) also buys the signal from DataForSEO on every sweep: for
+        (telegramChatId, with the agency's bot from Settings), watchtower (apiKey, a
+        service-account wta_ key with events:write, and watchtowerProjectId: posts an
+        event to that Watchtower project with POST /v1/projects/{prj}/events, alert_type
+        error, warning or info by severity, source seolyticize, aggregation_key the rule
+        id, tags kind:<kind> and client:<clientId>, and the detail and links in its
+        text) or hermetica (apiKey, hermeticaFrom and emailRecipients: the alert email
+        sent through the client's own Hermetica account with POST
+        /v1/transactional/send). The apiKey is stored sealed and never returned.
+        Webhooks must be https and public. With no channel and no destination, the alert
+        goes to the agency owner's email and deliveryNote says so; a channel named
+        without its field is refused as no_delivery_target. paidSource
+        (competitor-new-keywords and web-mentions only; off by default; needs spend
+        permission) also buys the signal from DataForSEO on every sweep: for
         competitor-new-keywords, Labs ranked keywords each tracker competitor (up to 5)
         newly ranks for at the tracker's market, not only tracked keywords; for
         web-mentions, pages DataForSEO's content index first saw naming the brand, off
@@ -1270,6 +1271,17 @@ class Tools:
         digests and task links that ran through it. Revoke the key at the provider too.
         Answers 'disconnect their Stripe'. Safe to repeat."""
         return self.call("disconnect_integration", _present({"clientId": client_id, "provider": provider}))
+
+    def dismiss_next_step(self, *, client_id: str, id_: str, reason: Optional[str] = None, restore: Optional[bool] = None) -> Any:
+        """Set a next step aside. Answers 'we have no GA4, stop listing it'. Marks one
+        get_next_steps item as not applicable for this client, with the reason
+        (google_analytics: 'the site has no GA4'; vendor_balance or search_data: 'no
+        paid SEO data, by the owner's choice'). The item stays in items with its live
+        status and dismissed {reason, at}, but leaves missing and blocked, so health no
+        longer turns degraded on it and a real gap is not lost among chosen ones.
+        restore: true brings it back. The required items (site, indexnow,
+        search_console, web_analytics, crawl) cannot be set aside. Safe to repeat. Free."""
+        return self.call("dismiss_next_step", _present({"clientId": client_id, "id": id_, "reason": reason, "restore": restore}))
 
     def draft_agent_files(self, *, client_id: str, ai_train: Literal["yes", "no"], ai_input: Optional[Literal["yes", "no"]] = None, search: Optional[Literal["yes", "no"]] = None, urls: Optional[List[str]] = None) -> Any:
         """Draft the site's files for AI agents. Drafts, for the client's site, the files
@@ -4650,7 +4662,7 @@ class Tools:
         Google the vacancy is filled'."""
         return self.call("notify_google_indexing", _present({"clientId": client_id, "urls": urls, "type": type_, "dryRun": dry_run}))
 
-    def onboard_site(self, *, domain: str, name: Optional[str] = None, framework: Optional[Literal["nextjs", "astro", "remix", "sveltekit", "nuxt", "html", "wordpress", "other"]] = None, keywords: Optional[List[str]] = None, verification: Optional[Literal["file", "meta", "dns"]] = None, health_key: Optional[bool] = None, tracker_frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None) -> Any:
+    def onboard_site(self, *, domain: str, name: Optional[str] = None, framework: Optional[Literal["nextjs", "astro", "remix", "sveltekit", "nuxt", "html", "wordpress", "other", "next"]] = None, keywords: Optional[List[str]] = None, verification: Optional[Literal["file", "meta", "dns"]] = None, health_key: Optional[bool] = None, tracker_frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None, dry_run: Optional[bool] = None) -> Any:
         """Onboard a site in one call. Answers 'set this site up'. Makes the client,
         project, site and rank tracker — or finds the client already here for this
         domain, so calling it twice is safe — issues the IndexNow key and a Google site
@@ -4662,7 +4674,7 @@ class Tools:
         trackerFrequency says otherwise, and the weekly domain sweep stays off until
         set_domain_sweep). Deploy all of it, then call verify_site. No Google sign-in or
         Search Console settings are needed at any point. Free."""
-        return self.call("onboard_site", _present({"domain": domain, "name": name, "framework": framework, "keywords": keywords, "verification": verification, "healthKey": health_key, "trackerFrequency": tracker_frequency}))
+        return self.call("onboard_site", _present({"domain": domain, "name": name, "framework": framework, "keywords": keywords, "verification": verification, "healthKey": health_key, "trackerFrequency": tracker_frequency, "dryRun": dry_run}))
 
     def page_headers(self, *, url: str, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
         """What the server actually returned. Status code, redirect chain, content type and
@@ -4851,6 +4863,16 @@ class Tools:
         may refer to orders earlier in the same batch. Answers 'send last night's orders
         in one request'. Free."""
         return self.call("record_orders", _present({"clientId": client_id, "orders": orders}))
+
+    def redeliver_alert(self, *, client_id: str, alert_id: str) -> Any:
+        """Send an alert again. Sends one alert that already fired (alertId is its id from
+        list_recent_alerts) down its rule's channel as it is set now, and records the
+        outcome on the alert: delivered and deliveryNote. Answers 'the site-down alert
+        never reached us, send it again' after fixing where the rule delivers. A send
+        that fails for a passing reason (a 5xx, 429 or timeout) is already tried again
+        on its own, with backoff, for 3 hours after firing; deliveryNote says when.
+        Sends even an alert that was delivered, so the channel gets it twice. Free."""
+        return self.call("redeliver_alert", _present({"clientId": client_id, "alertId": alert_id}))
 
     def refresh_domain_data(self, *, client_id: str, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
         """Refresh domain and backlink data now. Refreshes everything bought about the
@@ -5380,7 +5402,7 @@ class Tools:
         'crawl behind the login'. Free."""
         return self.call("set_crawl_auth", _present({"clientId": client_id, "basicAuth": basic_auth, "headers": headers, "cookies": cookies, "clear": clear}))
 
-    def set_crawl_schedule(self, *, client_id: str, cadence: Literal["off", "daily", "weekly", "monthly"], day: Optional[int] = None, hour: Optional[int] = None) -> Any:
+    def set_crawl_schedule(self, *, client_id: str, cadence: Literal["off", "daily", "weekly", "monthly"], day: Optional[Optional[int]] = None, hour: Optional[int] = None) -> Any:
         """Set when the site is crawled. Sets how often the client's site is crawled
         without anyone asking: off, daily, weekly or monthly; weekly on Monday at 02:00
         UTC unless changed. day is the weekday for weekly (0 Sunday to 6 Saturday;
@@ -5923,7 +5945,7 @@ class Tools:
         file loses its verification."""
         return self.call("verify_indexnow_key", _present({"clientId": client_id}))
 
-    def verify_site(self, *, client_id: str) -> Any:
+    def verify_site(self, *, client_id: str, recheck: Optional[bool] = None) -> Any:
         """Verify a deployed site and finish onboarding. Answers 'I deployed it, is
         everything connected'. After the onboard_site manifest is live, checks and
         completes everything in one call: the IndexNow key file, Google ownership (and
@@ -5931,7 +5953,7 @@ class Tools:
         history), whether analytics has received its first event, that robots.txt and
         the sitemap answer, and starts the first crawl. Returns a checklist where every
         item not done carries the exact fix and the next call. Safe to call again. Free."""
-        return self.call("verify_site", _present({"clientId": client_id}))
+        return self.call("verify_site", _present({"clientId": client_id, "recheck": recheck}))
 
     def verify_site_ownership(self, *, client_id: str, method: Optional[Literal["file", "meta", "dns"]] = None, site_url: Optional[str] = None, add_owners: Optional[List[str]] = None) -> Any:
         """Verify site ownership and connect Search Console. Answers 'the verification file
@@ -5967,7 +5989,9 @@ class Tools:
         API key or a person, the role, every permission that role holds, the clients it
         can reach, and vendorBalanceUsable (false when the agency's DataForSEO balance
         is empty and paid calls fail, null with no key of its own or when it cannot be
-        read). Answers 'what can this key do'. Call it first when unsure whether a task
+        read), the plan in force (planLapsed says when a bought plan's subscription has
+        lapsed to trial limits; get_billing has usage), and reach: the routes a key
+        calls. Answers 'what can this key do'. Call it first when unsure whether a task
         is allowed. Free."""
         return self.call("whoami", {})
 
