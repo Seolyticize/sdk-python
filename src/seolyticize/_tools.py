@@ -915,7 +915,7 @@ class Tools:
         returned. Free."""
         return self.call("connect_yandex_with_token", _present({"clientId": client_id, "token": token}))
 
-    def create_alert_rule(self, *, client_id: str, kind: Literal["rank-drop", "traffic-drop", "new-critical-issues", "backlinks-lost", "site-unreachable", "serp-features", "competitor-new-pages", "page-changes", "ai-mention-drop", "competitor-new-keywords", "web-mentions", "link-velocity"], threshold: int, cooldown_hours: Optional[int] = None, webhook_url: Optional[str] = None, channel: Optional[Literal["slack", "webhook", "discord", "email", "telegram", "watchtower", "hermetica"]] = None, email_recipients: Optional[List[str]] = None, telegram_chat_id: Optional[str] = None, api_key: Optional[str] = None, watchtower_project_id: Optional[str] = None, hermetica_from: Optional[str] = None, paid_source: Optional[bool] = None) -> Any:
+    def create_alert_rule(self, *, client_id: str, kind: Literal["rank-drop", "traffic-drop", "new-critical-issues", "backlinks-lost", "site-unreachable", "serp-features", "competitor-new-pages", "page-changes", "ai-mention-drop", "competitor-new-keywords", "web-mentions", "link-velocity"], threshold: Optional[int] = None, cooldown_hours: Optional[int] = None, webhook_url: Optional[str] = None, channel: Optional[Literal["slack", "webhook", "discord", "email", "telegram", "watchtower", "hermetica"]] = None, email_recipients: Optional[List[str]] = None, telegram_chat_id: Optional[str] = None, api_key: Optional[str] = None, watchtower_project_id: Optional[str] = None, hermetica_from: Optional[str] = None, paid_source: Optional[bool] = None) -> Any:
         """Create an alert rule. Raises an alert when a client's rankings, traffic, issues
         or backlinks cross a threshold, or the site goes down, and delivers it by
         channel. Threshold by kind: rank-drop positions fallen; traffic-drop percent
@@ -1014,16 +1014,18 @@ class Tools:
         whose secret was given to set_deploy_hook_sender_secret. A body may carry
         {release: {ref, source, environment, time}}, the release marker shared with
         other tools, shown on the timeline note. Returns hookId and url (neither is
-        secret), secret (sent as Authorization: Bearer or used to sign; shown only
-        here), webhookUrl (the secret in the path, only for senders that cannot set a
-        header or sign, such as Netlify, Vercel, Cloudflare Pages and Forumulate's
-        deploy_hook kind; treat that whole URL as a secret, since tools print URLs; it
-        works for as long as the hook does, by design, and pathUrl: false leaves it out
-        of the answer) and howToCall for each platform. A client that already has a hook
-        is refused with hook_exists and nothing changes; rotate_deploy_hook replaces the
-        secret. With ifMissing: true an existing hook is left alone and returned as
-        {created: false} without a secret, so a provisioning script can run it on every
-        deploy safely. Free."""
+        secret), secret (sent as Authorization: Bearer or used to sign; shown only here;
+        the hook URL alone does not authenticate), env (the SEOLYTICIZE_DEPLOY_HOOK_ID
+        and SEOLYTICIZE_DEPLOY_HOOK_SECRET lines for the pipeline's env file, which
+        seolyticize-notify-deploy reads), webhookUrl (the secret in the path, only for
+        senders that cannot set a header or sign, such as Netlify, Vercel, Cloudflare
+        Pages and Forumulate's deploy_hook kind; treat that whole URL as a secret, since
+        tools print URLs; it works for as long as the hook does, by design, and pathUrl:
+        false leaves it out of the answer) and howToCall for each platform. A client
+        that already has a hook is refused with hook_exists and nothing changes;
+        rotate_deploy_hook replaces the secret. With ifMissing: true an existing hook is
+        left alone and returned as {created: false} without a secret, so a provisioning
+        script can run it on every deploy safely. Free."""
         return self.call("create_deploy_hook", _present({"clientId": client_id, "sitemapUrl": sitemap_url, "sitemaps": sitemaps, "pathUrl": path_url, "ifMissing": if_missing}))
 
     def create_funnel(self, *, client_id: str, name: str, steps: List[Dict[str, Any]], upsert_by: Optional[Literal["name"]] = None, dry_run: Optional[bool] = None) -> Any:
@@ -1108,7 +1110,9 @@ class Tools:
 
     def create_rank_tracker(self, *, client_id: str, name: str, project_id: Optional[str] = None, domain: Optional[str] = None, engine: Optional[Literal["google", "bing", "youtube", "amazon", "app_store", "yandex", "baidu", "naver", "duckduckgo", "yahoo", "seznam", "google_play"]] = None, device: Optional[Literal["desktop", "mobile", "both"]] = None, frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None, location_code: Optional[int] = None, language_code: Optional[str] = None, run_hour: Optional[int] = None, run_day: Optional[int] = None, depth: Optional[int] = None, match: Optional[Literal["domain", "subdomains", "prefix"]] = None, url_prefix: Optional[str] = None) -> Any:
         """Create a rank tracker. Starts tracking a client's positions on one engine,
-        device and locale. Answers 'track this client on Bing too' or 'track mobile
+        device and locale. warnings says vendor_balance_empty when the agency's
+        DataForSEO balance is at or below zero, when the tracker captures nothing until
+        it is topped up. Answers 'track this client on Bing too' or 'track mobile
         separately'. Defaults to the client's first project and site domain. Engine and
         locale cannot be changed later — they are part of every keyword's identity — so
         a different market is a new tracker. A locale can be a city, county or region,
