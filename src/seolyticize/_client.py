@@ -14,7 +14,9 @@ from ._tools import READ_ONLY_TOOLS, Tools
 from .errors import NetworkError, RateLimitError, SeolyticizeError, error_for_status
 
 DEFAULT_BASE_URL = "https://seolyticize.com"
-VERSION = "0.5.12"
+VERSION = "0.5.13"
+#: How many times a call that answered 202 is collected before giving up: ten minutes at 5 s.
+MAX_POLLS = 120
 
 
 class Seolyticize(Tools):
@@ -57,26 +59,41 @@ class Seolyticize(Tools):
     def _request(self, method: str, path: str, body: Optional[Dict[str, Any]], tool: Optional[str], retry_transient: bool) -> Any:
         data = None if body is None else json.dumps(body).encode("utf-8")
         attempt = 0
+        # A slow call answers 202 with a key; the same body under it collects the answer.
+        key: Optional[str] = None
+        polls = 0
         while True:
+            headers = {
+                "authorization": f"Bearer {self.api_key}",
+                "content-type": "application/json",
+                "accept": "application/json",
+                "user-agent": f"seolyticize-python/{VERSION}",
+            }
+            if key:
+                headers["idempotency-key"] = key
             request = urllib.request.Request(
                 self.base_url + path,
                 data=data,
                 method=method,
-                headers={
-                    "authorization": f"Bearer {self.api_key}",
-                    "content-type": "application/json",
-                    "accept": "application/json",
-                    "user-agent": f"seolyticize-python/{VERSION}",
-                },
+                headers=headers,
             )
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
                     self._remember_rate(response.headers)
                     payload = json.loads(response.read().decode("utf-8") or "{}")
+                    if response.status == 202:
+                        key = payload.get("idempotencyKey") or key
+                        self._wait_for(key, polls, tool, payload.get("pollAfterSeconds"))
+                        polls += 1
+                        continue
                     return payload.get("data", payload)
             except urllib.error.HTTPError as failure:
                 self._remember_rate(failure.headers)
                 status = failure.code
+                if status == 409 and polls > 0:  # our own key, still running
+                    self._wait_for(key, polls, tool, _float(failure.headers.get("retry-after")))
+                    polls += 1
+                    continue
                 details = _details(failure)
                 retry_after = _float(failure.headers.get("retry-after"))
                 can_retry = attempt < self.max_retries
@@ -96,6 +113,15 @@ class Seolyticize(Tools):
                     attempt += 1
                     continue
                 raise NetworkError(f"No response from {self.base_url}: {failure}", tool=tool) from None
+
+    def _wait_for(self, key: Optional[str], polls: int, tool: Optional[str], after: Any) -> None:
+        if not key or polls >= MAX_POLLS:
+            raise SeolyticizeError(
+                f"{tool or 'The call'} is still running. Send the same body again with Idempotency-Key: {key} for its answer.",
+                code="still_running",
+                tool=tool,
+            )
+        self._sleep(float(after) if isinstance(after, (int, float)) else 5.0)
 
     def _remember_rate(self, headers: Any) -> None:
         if headers is None:

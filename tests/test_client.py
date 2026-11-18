@@ -74,6 +74,17 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(self.fake.client().get_next_steps(client_id="c"), {"ok": True})
         self.assertEqual(len(self.fake.requests), 2)
 
+    def test_a_slow_call_is_collected_under_its_key(self):
+        queued = {"ok": True, "outcome": "queued", "idempotencyKey": "async_k1", "pollAfterSeconds": 5}
+        self.fake.answers.append((202, queued, {}))
+        self.fake.answers.append((409, {"error": "Still running", "code": "in_progress"}, {}))
+        self.fake.answers.append((200, {"data": {"done": True}}, {}))
+        self.assertEqual(self.fake.client().call("start_crawl", {"clientId": "c"}), {"done": True})
+        self.assertEqual(len(self.fake.requests), 3)
+        self.assertNotIn("Idempotency-Key", self.fake.requests[0][2])
+        self.assertEqual(self.fake.requests[2][2].get("Idempotency-Key"), "async_k1")
+        self.assertEqual(self.fake.requests[2][3], {"clientId": "c"})
+
     def test_a_write_is_not_repeated_after_a_server_error(self):
         self.fake.answers.append((500, {"error": "Failed", "code": "internal_error"}, {}))
         with self.assertRaises(ServerError):
@@ -88,7 +99,7 @@ class ClientTests(unittest.TestCase):
 class SiteTests(unittest.TestCase):
     def test_analytics_tag(self):
         tag = analytics_tag("abc123", exclude=["/app/*", "/verify"], track=["outbound"])
-        for part in ('data-site="abc123"', 'data-exclude="/app/*,/verify"', 'data-track="outbound"', 'src="https://seolyticize.com/a.js"', " defer "):
+        for part in ('data-site="abc123"', 'data-exclude="/app/*,/verify"', 'data-track="outbound"', 'src="https://seolyticize.com/a.js?v=2"', " defer "):
             self.assertIn(part, tag)
         self.assertNotIn('"><x', analytics_tag('"><x'))
 
