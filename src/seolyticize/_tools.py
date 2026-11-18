@@ -5527,12 +5527,13 @@ class Tools:
         """Set up web analytics. Creates a client's cookieless web analytics, or changes
         which hostnames may report to it, and returns the same shape as
         get_web_analytics_setup: the one-line tracking snippet to add to every page, the
-        allowed hostnames and lastEventAt. Answers 'install tracking on this site'.
-        Without hostnames it allows the client's own domain and its www form; with
-        hostnames, those replace the list (up to 20; a visit from any other hostname is
-        ignored, so add staging or extra domains here). Safe to repeat: an existing
-        setup keeps its snippet. configured is false when the client has no site domain
-        to default to and no hostnames were given. Free."""
+        allowed hostnames and lastEventAt, plus readiness: the site's get_next_steps
+        summary (ready, health, missing and blocked item ids). Answers 'install tracking
+        on this site'. Without hostnames it allows the client's own domain and its www
+        form; with hostnames, those replace the list (up to 20; a visit from any other
+        hostname is ignored, so add staging or extra domains here). Safe to repeat: an
+        existing setup keeps its snippet. configured is false when the client has no
+        site domain to default to and no hostnames were given. Free."""
         return self.call("set_up_web_analytics", _present({"clientId": client_id, "hostnames": hostnames, "excludePaths": exclude_paths, "includePaths": include_paths, "pathTemplates": path_templates, "partners": partners, "respectRobots": respect_robots}))
 
     def simulate_serp_snippet(self, *, client_id: Optional[str] = None, url: Optional[str] = None, title: Optional[str] = None, description: Optional[str] = None) -> Any:
