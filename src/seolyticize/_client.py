@@ -14,7 +14,7 @@ from ._tools import READ_ONLY_TOOLS, Tools
 from .errors import NetworkError, RateLimitError, SeolyticizeError, error_for_status
 
 DEFAULT_BASE_URL = "https://seolyticize.com"
-VERSION = "0.5.14"
+VERSION = "0.5.15"
 #: How many times a call that answered 202 is collected before giving up: ten minutes at 5 s.
 MAX_POLLS = 120
 
