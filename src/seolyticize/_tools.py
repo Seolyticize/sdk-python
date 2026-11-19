@@ -526,14 +526,16 @@ class Tools:
         return self.call("batch_domain_metrics", _present({"domains": domains}))
 
     def bootstrap_keywords(self, *, client_id: str, seeds: Optional[List[str]] = None, competitor_domains: Optional[List[str]] = None, location_code: Optional[int] = None, language_code: Optional[str] = None, limit: Optional[int] = None) -> Any:
-        """Free keyword ideas for a new site. Keyword ideas that cost nothing, for a site
-        too new for Search Console rows and an agency with no vendor credit: Google
-        autocomplete suggestions and questions around each seed (default: the site's
-        name), and the page names in competitors' sitemaps (competitorDomains). Each
-        idea has its source and what it came from; there are no volumes, because none of
-        these sources publishes one — add the best to a rank tracker, or price them
-        later with get_keyword_metrics. Answers 'what should a brand-new site target'.
-        Free."""
+        """Free keyword ideas for a new site. Keyword ideas that cost nothing, for an
+        agency with no vendor credit: the client's own Search Console queries from the
+        last 90 days (source search_console, first), Google autocomplete suggestions and
+        questions around each seed (default: the site's name), and the page names in
+        competitors' sitemaps (competitorDomains). Each idea has its source and what it
+        came from; there are no volumes, because none of these sources publishes one —
+        add the best to a rank tracker, or price them later with get_keyword_metrics. A
+        source that fails does not fail the call: the answer has degraded: true and
+        missing names each source lost and why. Answers 'what should a brand-new site
+        target'. Free."""
         return self.call("bootstrap_keywords", _present({"clientId": client_id, "seeds": seeds, "competitorDomains": competitor_domains, "locationCode": location_code, "languageCode": language_code, "limit": limit}))
 
     def build_comparison_page(self, *, client_id: str, page_type: Literal["vs", "alternatives", "roundup", "table"], competitors: List[Dict[str, Any]], features: Optional[List[str]] = None, source_urls: Optional[List[str]] = None, category: Optional[str] = None, demand: Optional[bool] = None, instructions: Optional[str] = None, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
@@ -1204,7 +1206,7 @@ class Tools:
         do I test the tag in CI'. Free."""
         return self.call("create_test_token", _present({"clientId": client_id, "ttlMinutes": ttl_minutes}))
 
-    def create_webhook(self, *, url: str, events: List[Literal["crawl.completed", "gsc.synced", "rank.moved", "backlink.new", "backlink.lost", "issue.new_critical", "ai.citation.gained", "ai.citation.lost", "competitor.page.new", "budget.threshold", "alert.fired", "vendor.balance_low", "vendor.balance_empty", "deploy_hook.processed"]], client_id: Optional[str] = None) -> Any:
+    def create_webhook(self, *, url: str, events: List[Literal["crawl.completed", "gsc.synced", "rank.moved", "backlink.new", "backlink.lost", "issue.new_critical", "ai.citation.gained", "ai.citation.lost", "competitor.page.new", "budget.threshold", "alert.fired", "vendor.balance_low", "vendor.balance_empty", "deploy_hook.processed", "processor.updated"]], client_id: Optional[str] = None) -> Any:
         """Subscribe a URL to events. Sends events to an https URL as they happen, signed:
         each POST carries Seolyticize-Signature: t=<unix>,v1=<hex HMAC-SHA256 of
         "<t>.<body>" with the secret>, plus Seolyticize-Event and Seolyticize-Delivery
@@ -1214,15 +1216,19 @@ class Tools:
         redeliver_webhook one event by its id. Events: crawl.completed, gsc.synced,
         rank.moved, backlink.new, backlink.lost, issue.new_critical, ai.citation.gained,
         ai.citation.lost, competitor.page.new, budget.threshold, alert.fired,
-        vendor.balance_low, vendor.balance_empty, deploy_hook.processed.
-        deploy_hook.processed fires on each deploy hook run with what it read, changed
-        and submitted. vendor.balance_low (at set_vendor_balance_alert's threshold,
-        default $5) and vendor.balance_empty fire at most once a week while the balance
-        stays low, not once per crossing, and reach client-scoped webhooks too;
-        vendor.balance_empty fires again, once a day, with pausedScheduledRuns while
-        scheduled rank runs wait for funds. clientId limits it to one client; null is
-        every client. The secret is in the response once. Answers 'tell my system when a
-        crawl finishes'. Free."""
+        vendor.balance_low, vendor.balance_empty, deploy_hook.processed,
+        processor.updated. deploy_hook.processed fires on each deploy hook run with what
+        it read, changed and submitted. vendor.balance_low (at
+        set_vendor_balance_alert's threshold, default $5) and vendor.balance_empty fire
+        at most once a week while the balance stays low, not once per crossing, and
+        reach client-scoped webhooks too; vendor.balance_empty fires again, once a day,
+        with pausedScheduledRuns while scheduled rank runs wait for funds.
+        processor.updated fires once per new version of /.well-known/processor.json
+        (retention, sub-processors) with {version, updated, url}, to webhooks created
+        before that version and to client-scoped ones too, so a privacy notice or
+        consent manager can refresh. clientId limits it to one client; null is every
+        client. The secret is in the response once. Answers 'tell my system when a crawl
+        finishes'. Free."""
         return self.call("create_webhook", _present({"clientId": client_id, "url": url, "events": events}))
 
     def delete_alert_rule(self, *, client_id: str, rule_id: str) -> Any:
@@ -2592,9 +2598,12 @@ class Tools:
         engine amazon reads DataForSEO Labs' Amazon related keywords (with Amazon search
         volume; one seed). Answers 'what do people search on Amazon around this product'
         and 'what are the Bing variations of this term'. Google ideas are
-        keyword_explorer. A paid lookup on the client's account unless anyone read the
-        same thing recently (spend says which); quote it with estimate_cost. Can spend:
-        pass max_cost_micros to cap it."""
+        keyword_explorer. When the vendor cannot answer (no credit, no credentials, an
+        outage), it answers degraded: true with missing and ideas: the client's own
+        Search Console queries from the last 90 days that hold a seed's words, with
+        clicks, impressions and position but no volumes, free. A paid lookup on the
+        client's account unless anyone read the same thing recently (spend says which);
+        quote it with estimate_cost. Can spend: pass max_cost_micros to cap it."""
         return self.call("get_engine_keyword_ideas", _present({"clientId": client_id, "engine": engine, "seeds": seeds, "locationCode": location_code, "languageCode": language_code, "limit": limit, "maxCostMicros": max_cost_micros, "dryRun": dry_run}))
 
     def get_entity_coverage(self, *, client_id: str, keyword: str, url: Optional[str] = None, html: Optional[str] = None, markdown: Optional[str] = None, resolve: Optional[bool] = None, location_code: Optional[int] = None, language_code: Optional[str] = None, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
@@ -3727,7 +3736,11 @@ class Tools:
         how many show a client image, and the keywords where it ranks but has no image
         in the pack (best position first) — 'where should we be in image results'.
         Features are null for a capture whose source did not report them, which is not
-        the same as a page with none."""
+        the same as a page with none. While the tracker has no captures yet (a new
+        tracker, or no vendor credit), the answer is degraded: true, missing says what
+        is lacking, and searchAppearance gives Search Console's own result kinds (rich
+        results, FAQ, video and others) with clicks and impressions over the last 28
+        days, free."""
         return self.call("get_serp_features", _present({"clientId": client_id, "trackerId": tracker_id, "device": device}))
 
     def get_serp_history(self, *, client_id: str, keyword: str, from_: Optional[str] = None, to: Optional[str] = None, location_code: Optional[int] = None, language_code: Optional[str] = None, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
@@ -4131,7 +4144,7 @@ class Tools:
         client. Free."""
         return self.call("get_web_analytics_summary", _present({"clientId": client_id, "days": days}))
 
-    def get_webhook_schemas(self, *, type_: Optional[Literal["crawl.completed", "gsc.synced", "rank.moved", "backlink.new", "backlink.lost", "issue.new_critical", "ai.citation.gained", "ai.citation.lost", "competitor.page.new", "budget.threshold", "alert.fired", "vendor.balance_low", "vendor.balance_empty", "deploy_hook.processed"]] = None) -> Any:
+    def get_webhook_schemas(self, *, type_: Optional[Literal["crawl.completed", "gsc.synced", "rank.moved", "backlink.new", "backlink.lost", "issue.new_critical", "ai.citation.gained", "ai.citation.lost", "competitor.page.new", "budget.threshold", "alert.fired", "vendor.balance_low", "vendor.balance_empty", "deploy_hook.processed", "processor.updated"]] = None) -> Any:
         """The JSON Schema of each webhook event. The JSON Schema (2020-12) of a webhook
         delivery body for each event type, or for the one type given: the envelope {id,
         type, createdAt, clientId, data, deliveryId} and that type's data. Fields are
@@ -4326,7 +4339,11 @@ class Tools:
         seed, mode and market; every later filter on the same seed is free. Rows a
         filter cannot judge because the number is unknown are left out and counted in
         unknownExcluded rather than treated as zero. Set format to csv for every
-        matching row as a CSV file. Can spend: pass max_cost_micros to cap it."""
+        matching row as a CSV file. When the vendor cannot answer (no credit, no
+        credentials, an outage), it answers degraded: true with missing and ideas: the
+        client's own Search Console queries from the last 90 days that hold a seed's
+        words, with clicks, impressions and position but no volumes, free. Can spend:
+        pass max_cost_micros to cap it."""
         return self.call("keyword_explorer", _present({"clientId": client_id, "seed": seed, "mode": mode, "locationCode": location_code, "languageCode": language_code, "filters": filters, "sort": sort, "page": page, "pageSize": page_size, "format": format_, "maxCostMicros": max_cost_micros, "dryRun": dry_run}))
 
     def keyword_traffic_potential(self, *, client_id: str, term: str, location_code: Optional[int] = None, language_code: Optional[str] = None, refresh: Optional[bool] = None, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
