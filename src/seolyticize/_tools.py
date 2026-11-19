@@ -19,6 +19,7 @@ READ_ONLY_TOOLS = frozenset({
     "check_url_safety",
     "compare_crawls",
     "describe_datasets",
+    "describe_tool",
     "draft_agent_files",
     "estimate_ai_visibility_cost",
     "estimate_cost",
@@ -269,7 +270,7 @@ READ_ONLY_TOOLS = frozenset({
     "whoami",
 })
 
-TOOL_COUNT = 537
+TOOL_COUNT = 539
 
 
 def _present(values: Dict[str, Any]) -> Dict[str, Any]:
@@ -427,29 +428,30 @@ class Tools:
         assistants reading'. Free."""
         return self.call("analyse_server_log", _present({"clientId": client_id, "contents": contents}))
 
-    def apply_manifest(self, *, domain: str, name: Optional[str] = None, framework: Optional[Literal["nextjs", "astro", "remix", "sveltekit", "nuxt", "html", "wordpress", "other"]] = None, verification: Optional[Literal["file", "meta", "dns"]] = None, tracker_frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None, first_crawl: Optional[Literal["now", "afterVerify", "never"]] = None, monthly_budget_usd: Optional[float] = None, budget_alert_at: Optional[float] = None, domain_sweep: Optional[bool] = None, deploy_hook: Optional[bool] = None, health_key: Optional[bool] = None, brief: Optional[Dict[str, Any]] = None, analytics: Optional[Dict[str, Any]] = None, crawl: Optional[Dict[str, Any]] = None, alerts: Optional[Dict[str, Any]] = None, platforms: Optional[Dict[str, Any]] = None, environments: Optional[List[Dict[str, Any]]] = None, facts: Optional[List[Dict[str, Any]]] = None, goals: Optional[List[Dict[str, Any]]] = None, funnels: Optional[List[Dict[str, Any]]] = None, dry_run: Optional[bool] = None) -> Any:
+    def apply_manifest(self, *, domain: str, name: Optional[str] = None, framework: Optional[Literal["nextjs", "astro", "remix", "sveltekit", "nuxt", "html", "wordpress", "other"]] = None, verification: Optional[Literal["file", "meta", "dns"]] = None, tracker_frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None, first_crawl: Optional[Literal["now", "afterVerify", "never"]] = None, monthly_budget_usd: Optional[float] = None, budget_alert_at: Optional[float] = None, domain_sweep: Optional[bool] = None, deploy_hook: Optional[bool] = None, health_key: Optional[bool] = None, brief: Optional[Dict[str, Any]] = None, analytics: Optional[Dict[str, Any]] = None, crawl: Optional[Dict[str, Any]] = None, alerts: Optional[Dict[str, Any]] = None, path_owners: Optional[List[Dict[str, Any]]] = None, platforms: Optional[Dict[str, Any]] = None, environments: Optional[List[Dict[str, Any]]] = None, facts: Optional[List[Dict[str, Any]]] = None, goals: Optional[List[Dict[str, Any]]] = None, funnels: Optional[List[Dict[str, Any]]] = None, dry_run: Optional[bool] = None) -> Any:
         """Bring a client to what its repo declares. Answers 'provision our product from
         its manifest' in one call that is safe to run on every deploy. Takes what a
         repository declares about its site (domain, framework, verification, tracker
         cadence, budget and its alert share, domain sweep, deploy hook, analytics paths
-        and partners, crawl settings, default alerts and where they go, brief and brand
-        terms, facts, goals, funnels, sibling platforms (a Forumulate host, and with its
-        org and a token its signed publish webhook; Atlas, Cookie Munch, Watchtower,
-        Hermetica and Referalli by id), environments such as staging) and brings the
-        client to it through the existing tools, each with its own permission and
-        checks. Each part is compared with what is there first: a step is kept when it
-        would write nothing, ran when it changed something, would_run on a dry run.
-        patch is an RFC 6902 JSON Patch of what the run changed, or on a dry run would
-        change, against the live config, each path starting with its section
-        (/crawl/render, /budget/monthlyUsd, /goals/Signup); an empty patch on a dry run
-        means the live config matches the manifest, so CI can fail the build on drift.
-        Fields the manifest leaves out are left as they are. files (the IndexNow key and
-        Google verification file, which are public) come back on every real run. env
-        lists each environment variable to set: build (read at build time), runtime and
-        secrets, with public ids as values and secrets only as a placeholder naming the
-        tool that issues them. A new deploy hook's secret is in its step's result only,
-        once. A deployer key may run it with dryRun only. Free."""
-        return self.call("apply_manifest", _present({"domain": domain, "name": name, "framework": framework, "verification": verification, "trackerFrequency": tracker_frequency, "firstCrawl": first_crawl, "monthlyBudgetUsd": monthly_budget_usd, "budgetAlertAt": budget_alert_at, "domainSweep": domain_sweep, "deployHook": deploy_hook, "healthKey": health_key, "brief": brief, "analytics": analytics, "crawl": crawl, "alerts": alerts, "platforms": platforms, "environments": environments, "facts": facts, "goals": goals, "funnels": funnels, "dryRun": dry_run}))
+        and partners, crawl settings, default alerts and where they go (Watchtower
+        included), path owners, brief and brand terms, facts, goals, funnels, sibling
+        platforms (a Forumulate host, and with its org and a token its signed publish
+        webhook; Atlas, Cookie Munch, Watchtower, Hermetica and Referalli by id),
+        environments such as staging) and brings the client to it through the existing
+        tools, each with its own permission and checks. Each part is compared with what
+        is there first: a step is kept when it would write nothing, ran when it changed
+        something, would_run on a dry run. patch is an RFC 6902 JSON Patch of what the
+        run changed, or on a dry run would change, against the live config, each path
+        starting with its section (/crawl/render, /budget/monthlyUsd, /goals/Signup); an
+        empty patch on a dry run means the live config matches the manifest, so CI can
+        fail the build on drift. Fields the manifest leaves out are left as they are.
+        files (the IndexNow key and Google verification file, which are public) come
+        back on every real run. env lists each environment variable to set: build (read
+        at build time), runtime and secrets, with public ids as values and secrets only
+        as a placeholder naming the tool that issues them. A new deploy hook's secret is
+        in its step's result only, once. A deployer key may run it with dryRun only.
+        Free."""
+        return self.call("apply_manifest", _present({"domain": domain, "name": name, "framework": framework, "verification": verification, "trackerFrequency": tracker_frequency, "firstCrawl": first_crawl, "monthlyBudgetUsd": monthly_budget_usd, "budgetAlertAt": budget_alert_at, "domainSweep": domain_sweep, "deployHook": deploy_hook, "healthKey": health_key, "brief": brief, "analytics": analytics, "crawl": crawl, "alerts": alerts, "pathOwners": path_owners, "platforms": platforms, "environments": environments, "facts": facts, "goals": goals, "funnels": funnels, "dryRun": dry_run}))
 
     def archive_client(self, *, client_id: str) -> Any:
         """Archive a client. Retires a client: it stops being tracked, crawled and reported
@@ -972,25 +974,31 @@ class Tools:
         watchtowerProjectId: posts an event to that Watchtower project with POST
         /v1/projects/{prj}/events, alert_type error, warning or info by severity, source
         seolyticize, aggregation_key the rule id, tags kind:<kind> and
-        client:<clientId>, and the detail and links in its text) or hermetica (apiKey,
-        hermeticaFrom and emailRecipients: the alert email sent through the client's own
-        Hermetica account with POST /v1/transactional/send). The apiKey is stored sealed
-        and never returned. Webhooks must be https and public. With no channel and no
-        destination, the alert goes to the client's linked Watchtower project
-        (link_watchtower), else the agency owner's email, and deliveryNote says so; a
-        deployment with no email provider sends it through the client's own Hermetica
-        when the client has a hermetica rule, and otherwise refuses it as
-        no_delivery_target; a channel named without its field is refused as
-        no_delivery_target. paidSource (competitor-new-keywords and web-mentions only;
-        off by default; needs spend permission) also buys the signal from DataForSEO on
-        every sweep: for competitor-new-keywords, Labs ranked keywords each tracker
-        competitor (up to 5) newly ranks for at the tracker's market, not only tracked
-        keywords; for web-mentions, pages DataForSEO's content index first saw naming
-        the brand, off the client's own domains. The sweep is hourly but a purchase is
-        reused from the archive while fresh, so it buys at most once a week per
-        competitor (once a day for mentions); it is capped by the client's monthly
-        budget, and a failed or over-budget read falls back to the free signal. Quote it
-        first with estimate_cost. Answers 'tell me when rankings drop'."""
+        client:<clientId>, and the detail and links in its text) or hermetica (apiKey, a
+        key from Hermetica preset atlas-transport bound to app seolyticize,
+        hermeticaFrom a verified sender, and emailRecipients: the alert email sent
+        through the client's own Hermetica account with POST /v1/transactional/send-raw,
+        tagged seolyticize, untracked, one idempotency key per alert and recipient; the
+        key is checked on save with GET /v1/me, a refused key or one without
+        messages:send is refused, and a workspace that cannot send yet is saved with
+        undeliverableBecause naming GET /v1/readiness's fix; test_alert_rule sends it to
+        delivered@sandbox.hermeticor.test). The apiKey is stored sealed and never
+        returned. Webhooks must be https and public. With no channel and no destination,
+        the alert goes to the client's linked Watchtower project (link_watchtower), else
+        the agency owner's email, and deliveryNote says so; a deployment with no email
+        provider sends it through the client's own Hermetica when the client has a
+        hermetica rule, and otherwise refuses it as no_delivery_target; a channel named
+        without its field is refused as no_delivery_target. paidSource
+        (competitor-new-keywords and web-mentions only; off by default; needs spend
+        permission) also buys the signal from DataForSEO on every sweep: for
+        competitor-new-keywords, Labs ranked keywords each tracker competitor (up to 5)
+        newly ranks for at the tracker's market, not only tracked keywords; for
+        web-mentions, pages DataForSEO's content index first saw naming the brand, off
+        the client's own domains. The sweep is hourly but a purchase is reused from the
+        archive while fresh, so it buys at most once a week per competitor (once a day
+        for mentions); it is capped by the client's monthly budget, and a failed or
+        over-budget read falls back to the free signal. Quote it first with
+        estimate_cost. Answers 'tell me when rankings drop'."""
         return self.call("create_alert_rule", _present({"clientId": client_id, "kind": kind, "threshold": threshold, "cooldownHours": cooldown_hours, "webhookUrl": webhook_url, "channel": channel, "emailRecipients": email_recipients, "telegramChatId": telegram_chat_id, "apiKey": api_key, "botToken": bot_token, "watchtowerProjectId": watchtower_project_id, "hermeticaFrom": hermetica_from, "paidSource": paid_source}))
 
     def create_api_key(self, *, name: str, client_id: Optional[str] = None, role: Optional[Literal["client_viewer", "analyst", "manager", "site_admin", "deployer", "admin"]] = None, expires_in_days: Optional[int] = None, max_cost_usd_per_call: Optional[float] = None, mode: Optional[Literal["live", "test"]] = None, allowed_cidrs: Optional[List[str]] = None) -> Any:
@@ -1063,13 +1071,14 @@ class Tools:
         seolyticize-notify-deploy reads, with <secret> where the secret goes: a secret
         is never repeated inside free text), webhookUrl (the secret in the path, only
         for senders that cannot set a header or sign, such as Netlify, Vercel,
-        Cloudflare Pages and Forumulate's deploy_hook kind; treat that whole URL as a
-        secret, since tools print URLs; it works for as long as the hook does, by
-        design, and pathUrl: false leaves it out of the answer) and howToCall for each
-        platform. A client that already has a hook is refused with hook_exists and
-        nothing changes; rotate_deploy_hook replaces the secret. With ifMissing: true an
-        existing hook is left alone and returned as {created: false} without a secret,
-        so a provisioning script can run it on every deploy safely. Free."""
+        Cloudflare Pages, Coolify's team webhook and (deprecated) Forumulate's
+        deploy_hook kind; treat that whole URL as a secret, since tools print URLs; it
+        works for as long as the hook does, by design, and pathUrl: false leaves it out
+        of the answer) and howToCall for each platform. A client that already has a hook
+        is refused with hook_exists and nothing changes; rotate_deploy_hook replaces the
+        secret. With ifMissing: true an existing hook is left alone and returned as
+        {created: false} without a secret, so a provisioning script can run it on every
+        deploy safely. Free."""
         return self.call("create_deploy_hook", _present({"clientId": client_id, "sitemapUrl": sitemap_url, "sitemaps": sitemaps, "pathUrl": path_url, "ifMissing": if_missing}))
 
     def create_funnel(self, *, client_id: str, name: str, steps: List[Dict[str, Any]], upsert_by: Optional[Literal["name"]] = None, dry_run: Optional[bool] = None) -> Any:
@@ -1155,18 +1164,19 @@ class Tools:
         written like example.com."""
         return self.call("create_project", _present({"clientId": client_id, "name": name, "domain": domain, "locationCode": location_code, "languageCode": language_code}))
 
-    def create_rank_tracker(self, *, client_id: str, name: str, project_id: Optional[str] = None, domain: Optional[str] = None, engine: Optional[Literal["google", "bing", "youtube", "amazon", "app_store", "yandex", "baidu", "naver", "duckduckgo", "yahoo", "seznam", "google_play"]] = None, device: Optional[Literal["desktop", "mobile", "both"]] = None, frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None, location_code: Optional[int] = None, language_code: Optional[str] = None, run_hour: Optional[int] = None, run_day: Optional[int] = None, depth: Optional[int] = None, match: Optional[Literal["domain", "subdomains", "prefix"]] = None, url_prefix: Optional[str] = None) -> Any:
+    def create_rank_tracker(self, *, client_id: str, name: str, project_id: Optional[str] = None, domain: Optional[str] = None, engine: Optional[Literal["google", "bing", "youtube", "amazon", "app_store", "yandex", "baidu", "naver", "duckduckgo", "yahoo", "seznam", "google_play"]] = None, device: Optional[Literal["desktop", "mobile", "both"]] = None, frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None, location_code: Optional[int] = None, language_code: Optional[str] = None, run_hour: Optional[int] = None, run_day: Optional[int] = None, depth: Optional[int] = None, match: Optional[Literal["domain", "subdomains", "prefix"]] = None, url_prefix: Optional[str] = None, allow_while_blocked: Optional[bool] = None) -> Any:
         """Create a rank tracker. Starts tracking a client's positions on one engine,
-        device and locale. warnings says vendor_balance_empty when the agency's
-        DataForSEO balance is at or below zero, when the tracker captures nothing until
-        it is topped up. Answers 'track this client on Bing too' or 'track mobile
+        device and locale. While the agency's DataForSEO balance is at or below zero it
+        is refused with code vendor_balance_empty, since the tracker would capture
+        nothing until topped up; allowWhileBlocked: true creates it anyway, with that
+        warning in warnings. Answers 'track this client on Bing too' or 'track mobile
         separately'. Defaults to the client's first project and site domain. Engine and
         locale cannot be changed later — they are part of every keyword's identity — so
         a different market is a new tracker. A locale can be a city, county or region,
         not only a country: search_locations finds the code. Cadence daily, weekly,
         monthly or manual, at a chosen UTC hour and day; depth 10–200; match the exact
         host, its subdomains, or a URL prefix."""
-        return self.call("create_rank_tracker", _present({"clientId": client_id, "name": name, "projectId": project_id, "domain": domain, "engine": engine, "device": device, "frequency": frequency, "locationCode": location_code, "languageCode": language_code, "runHour": run_hour, "runDay": run_day, "depth": depth, "match": match, "urlPrefix": url_prefix}))
+        return self.call("create_rank_tracker", _present({"clientId": client_id, "name": name, "projectId": project_id, "domain": domain, "engine": engine, "device": device, "frequency": frequency, "locationCode": location_code, "languageCode": language_code, "runHour": run_hour, "runDay": run_day, "depth": depth, "match": match, "urlPrefix": url_prefix, "allowWhileBlocked": allow_while_blocked}))
 
     def create_report(self, *, client_id: str, title: str, sections: List[Literal["rank-summary", "share-of-voice", "keyword-movers", "backlink-summary", "traffic", "core-web-vitals", "site-health", "audit-summary"]]) -> Any:
         """Create a report. Saves a report for a client from a list of sections; each is
@@ -1339,6 +1349,13 @@ class Tools:
         landing page), AI assistant visits — with their columns, metrics, time column
         and how long each is kept. Answers 'what data is there to ask about'. Free."""
         return self.call("describe_datasets", {})
+
+    def describe_tool(self, *, name: str) -> Any:
+        """One tool's schema. One tool's description and JSON input schema: the entry GET
+        /api/v1/tools lists for it (also GET /api/v1/tools/{name}), without reading the
+        whole catalogue. Only tools this key may call. Answers 'what arguments does
+        onboard_site take'. Free."""
+        return self.call("describe_tool", _present({"name": name}))
 
     def disconnect_app(self, *, grant_id: str) -> Any:
         """Disconnect an app. Stops a signed-in app working, at once: its access and
@@ -2543,10 +2560,16 @@ class Tools:
         source and ref in brackets when it sent them), how many sitemap pages it knows,
         url (the address to call; not secret, the value of SEOLYTICIZE_DEPLOY_HOOK_URL),
         signing (hookSecret: signed calls work; senderSecret: a sender's own secret is
-        set) and howToCall: anyPipeline, signed (the body signed with
-        Seolyticize-Signature, no secret in the URL), coolify (a git build's
-        post-deployment command), prebuiltImage (seolyticize-notify-deploy --wait-for
-        from the deploy script), githubActions, vercel, forumulate and knownPages. Every
+        set; warnings says so while senderSecret is false, since a Forumulate webhook
+        can then only be the deprecated secret-in-URL kind) and howToCall: anyPipeline,
+        signed (the body signed with Seolyticize-Signature, no secret in the URL),
+        coolify (a git build's post-deployment command), coolifyWebhook (Coolify's team
+        webhook with ?source=coolify: each successful deployment of the client's site is
+        a deploy, no command), watchtower (a Watchtower webhook receiver on
+        deployment.created with ?source=watchtower), prebuiltImage
+        (seolyticize-notify-deploy --wait-for from the deploy script), githubActions,
+        vercel, forumulate (the one canonical, signed recipe: link_content_platform with
+        org and apiKey; the secret-in-URL ones marked deprecated) and knownPages. Every
         call belongs after the new version serves; ref is free text. hookId is not
         secret. Never the secret itself: a lost one is replaced with rotate_deploy_hook.
         Free."""
@@ -2831,8 +2854,10 @@ class Tools:
         conversion rate and value for each goal (default every goal), broken down by
         channel, landing page, source, campaign, the AI assistant that referred the
         visit, or the Search Console query cluster bringing people to the landing page.
-        Answers 'which channel brings sign-ups', 'what is organic search worth in
-        conversions', 'do visits from ChatGPT convert'. Free."""
+        Conversions and value joined to no visit (a server event sent without ip, ua or
+        visit token) are their own (unattributed) row. Answers 'which channel brings
+        sign-ups', 'what is organic search worth in conversions', 'do visits from
+        ChatGPT convert'. Free."""
         return self.call("get_goal_report", _present({"clientId": client_id, "goalIds": goal_ids, "by": by, "days": days, "limit": limit}))
 
     def get_google_service_account(self) -> Any:
@@ -3259,14 +3284,20 @@ class Tools:
         this site, and what call does it' and 'what is not connected for this client,
         and what does each missing piece block'. missing lists the ids of every item not
         done. ready is true once the required items are done (set up); health is
-        degraded, with blocked naming the items, while anything is blocked, even with
-        ready true. The onboarding checklist with live status — done, todo, in progress,
-        failed or blocked and why — each with the exact tool and arguments to call next;
-        then the optional connections that unlock more tools (Bing Webmaster key,
-        PageSpeed / Chrome UX Report key, alert delivery, rank tracker keywords, AI
-        visibility schedule, analytics goals, crawl schedule), each with its status and
-        call; then, once the site is set up, the weekly loop's calls with their
-        arguments. Reads only; changes nothing. Free."""
+        degraded, with blocked naming each blocked item by its code when it has one
+        (vendor_balance_empty, for every client of an agency whose DataForSEO balance is
+        empty) or else its id, while anything is blocked, even with ready true. Each
+        item has runnable (run_next_steps may run its call unattended) and precondition
+        (what it waits for). ai_crawler_blocked and search_crawler_blocked name GPTBot,
+        ClaudeBot, PerplexityBot, Googlebot or Bingbot refused the home page and the
+        layer that refuses it (robots.txt, cdn, origin, challenge, app_shell). The
+        onboarding checklist with live status — done, todo, in progress, failed or
+        blocked and why — each with the exact tool and arguments to call next; then the
+        optional connections that unlock more tools (Bing Webmaster key, PageSpeed /
+        Chrome UX Report key, alert delivery, rank tracker keywords, AI visibility
+        schedule, analytics goals, crawl schedule), each with its status and call; then,
+        once the site is set up, the weekly loop's calls with their arguments. Reads
+        only; changes nothing. Free."""
         return self.call("get_next_steps", _present({"clientId": client_id}))
 
     def get_opportunities(self, *, client_id: str, limit: Optional[int] = None) -> Any:
@@ -3889,8 +3920,11 @@ class Tools:
         properties are connected and syncing, the latest crawl, and coveredHosts: every
         host the client's pages are served on (the site's domain, then content platforms
         linked with link_content_platform), each with whether the analytics counts it,
-        the deploy hook sitemaps read on it and whether the crawl covers it. Answers 'is
-        this site set up and verified' and 'which hosts does Seolyticize watch'."""
+        the deploy hook sitemaps read on it and whether the crawl covers it; and
+        blocked: what stops data collection for the whole agency now
+        (vendor_balance_empty while its DataForSEO balance is at or below zero), with
+        blockedDetail. Answers 'is this site set up and verified' and 'which hosts does
+        Seolyticize watch'."""
         return self.call("get_site_status", _present({"clientId": client_id}))
 
     def get_snippet_targets(self, *, client_id: str, limit: Optional[int] = None, draft: Optional[bool] = None, read_missing: Optional[bool] = None, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
@@ -4428,24 +4462,24 @@ class Tools:
         of PUT /orgs/{orgId}/analytics-tags (or a site's or space's), which sends
         pageviews with no script, gated as first-party measurement by the consent
         settings (firstPartyAnalytics); robots.txt names the host's sitemap; and
-        publishes call the deploy hook one of three ways, as get_deploy_hook's
-        howToCall.forumulate spells out: (1, recommended) an ordinary signed webhook,
-        POST /orgs/{orgId}/webhooks {url: the hook's url, events: [page.live,
-        publish.completed]}, whose one-time signing secret goes to
-        set_deploy_hook_sender_secret, so no secret is in any URL; (2) Settings →
-        Analytics, PUT /orgs/{orgId}/seolyticize/deploy-hook {url: webhookUrl}, the same
-        webhook with a secret it never answers; (3) a webhook of kind deploy_hook (a
-        manifest's webhooks entry {kind: deploy_hook, url: webhookUrl, events:
-        [page.published]}; page.live and topic.published also allowed, publish.completed
-        not), an unsigned empty POST with ?source=forumulate&ref=<event>, which
-        get_deploy_hook's lastResult shows. (2) and (3) carry no signature Seolyticize
-        can check, so they need the webhookUrl holding the secret. With org and apiKey
-        (a Forumulate token with the write scope, used for these calls only and never
-        stored) and a deploy hook in place, (1) is done here: the webhook is created
-        with externalRef seolyticize-deploy-<hookId> (so a repeat finds it), its secret
-        stored as the hook's sender secret (rotated when Forumulate does not show it
-        again and none is stored), and publishes reports connected, kept, no_deploy_hook
-        or failed with Forumulate's error. Safe to repeat. Free."""
+        publishes call the deploy hook. The one canonical, signed integration is this
+        tool with kind forumulate, org, apiKey and mounts auto: one call for the signed
+        webhook, the path owners, the partner paths, the per-mount sitemaps and the site
+        key on each mounted space. The secret-in-URL ways (Settings → Analytics PUT
+        /orgs/{orgId}/seolyticize/deploy-hook, and a webhook of kind deploy_hook on
+        page.published) still work and are deprecated; get_deploy_hook warns while the
+        hook has no sender secret. With org and apiKey (a Forumulate token with the
+        write scope, used for these calls only and never stored) and a deploy hook in
+        place, (1) is done here: the webhook is created with externalRef
+        seolyticize-deploy-<hookId> (so a repeat finds it), its secret stored as the
+        hook's sender secret (rotated when Forumulate does not show it again and none is
+        stored), and publishes reports connected, kept, no_deploy_hook or failed with
+        Forumulate's error. With org, apiKey and mounts auto, the client's analytics
+        site key is also set as the seolyticize field of each mounted space (PATCH
+        /orgs/{orgId}/spaces/{spaceId}/analytics-tags, from Forumulate's API reference;
+        a space already holding it is left alone), so path-mode pages count without a
+        tag of their own; mounts.siteKey lists the spaces set, kept and failed. Safe to
+        repeat. Free."""
         return self.call("link_content_platform", _present({"clientId": client_id, "kind": kind, "host": host, "sitemapUrl": sitemap_url, "org": org, "mounts": mounts, "apiKey": api_key}))
 
     def link_sibling_platforms(self, *, client_id: str, atlas: Optional[Dict[str, Any]] = None, cookie_munch: Optional[Dict[str, Any]] = None, watchtower: Optional[Dict[str, Any]] = None, hermetica: Optional[Dict[str, Any]] = None, referalli: Optional[Dict[str, Any]] = None, dry_run: Optional[bool] = None) -> Any:
@@ -4481,10 +4515,12 @@ class Tools:
     def list_alert_rules(self, *, client_id: str) -> Any:
         """List alert rules. What a client's alerts watch for, at what threshold, and
         whether each is paused and can be delivered (hasDeliveryTarget false: it fires
-        into nothing, undeliverableBecause says why, e.g. no address or no email
-        provider on this deployment; undeliverable lists those rules with the fix).
-        Lists the rules; list_recent_alerts lists what they fired. add_default_alerts
-        adds the starting four."""
+        into nothing, undeliverableBecause says why, e.g. no address, no email provider
+        on this deployment, or a hermetica rule whose Hermetica workspace has no
+        verified sender matching hermeticaFrom, asked live with the rule's key;
+        undeliverable lists those rules with the fix). Lists the rules;
+        list_recent_alerts lists what they fired. add_default_alerts adds the starting
+        four."""
         return self.call("list_alert_rules", _present({"clientId": client_id}))
 
     def list_annotations(self, *, client_id: str, from_: Optional[str] = None, to: Optional[str] = None, include_google: Optional[bool] = None) -> Any:
@@ -4906,7 +4942,7 @@ class Tools:
         Google the vacancy is filled'."""
         return self.call("notify_google_indexing", _present({"clientId": client_id, "urls": urls, "type": type_, "dryRun": dry_run}))
 
-    def onboard_site(self, *, domain: str, name: Optional[str] = None, framework: Optional[Literal["nextjs", "astro", "remix", "sveltekit", "nuxt", "html", "wordpress", "other", "next"]] = None, keywords: Optional[List[str]] = None, verification: Optional[Literal["file", "meta", "dns"]] = None, health_key: Optional[bool] = None, tracker_frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None, first_crawl: Optional[Literal["now", "afterVerify", "never"]] = None, dry_run: Optional[bool] = None) -> Any:
+    def onboard_site(self, *, domain: str, name: Optional[str] = None, framework: Optional[Literal["nextjs", "astro", "remix", "sveltekit", "nuxt", "html", "wordpress", "other", "next"]] = None, keywords: Optional[List[str]] = None, verification: Optional[Literal["file", "meta", "dns"]] = None, health_key: Optional[bool] = None, tracker_frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None, first_crawl: Optional[Literal["now", "afterVerify", "never"]] = None, allow_while_blocked: Optional[bool] = None, dry_run: Optional[bool] = None) -> Any:
         """Onboard a site in one call. Answers 'set this site up'. Makes the client,
         project, site and rank tracker — or finds the client already here for this
         domain, so calling it twice is safe — issues the IndexNow key and a Google site
@@ -4916,9 +4952,12 @@ class Tools:
         plus scheduledPaidWork: anything paid it leaves running on a schedule (nothing,
         for a new client: its tracker runs only once it has keywords, weekly unless
         trackerFrequency says otherwise, and the weekly domain sweep stays off until
-        set_domain_sweep). Deploy all of it, then call verify_site. No Google sign-in or
-        Search Console settings are needed at any point. Free."""
-        return self.call("onboard_site", _present({"domain": domain, "name": name, "framework": framework, "keywords": keywords, "verification": verification, "healthKey": health_key, "trackerFrequency": tracker_frequency, "firstCrawl": first_crawl, "dryRun": dry_run}))
+        set_domain_sweep). While the agency's DataForSEO balance is empty a new client
+        gets no tracker (skipped names the step, code vendor_balance_empty) unless
+        allowWhileBlocked is true; the rest is set up either way. Deploy all of it, then
+        call verify_site. No Google sign-in or Search Console settings are needed at any
+        point. Free."""
+        return self.call("onboard_site", _present({"domain": domain, "name": name, "framework": framework, "keywords": keywords, "verification": verification, "healthKey": health_key, "trackerFrequency": tracker_frequency, "firstCrawl": first_crawl, "allowWhileBlocked": allow_while_blocked, "dryRun": dry_run}))
 
     def page_headers(self, *, url: str, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
         """What the server actually returned. Status code, redirect chain, content type and
@@ -5378,6 +5417,20 @@ class Tools:
         the limit. Answers 'scan our map-pack visibility now'. Can spend: pass
         max_cost_micros to cap it."""
         return self.call("run_local_grid_scan", _present({"clientId": client_id, "locationId": location_id, "term": term, "size": size, "spacingKm": spacing_km, "device": device, "moreTerms": more_terms, "maxCostMicros": max_cost_micros, "dryRun": dry_run}))
+
+    def run_next_steps(self, *, client_id: str, dry_run: Optional[bool] = None) -> Any:
+        """Run the next steps that need no person. Answers 'the deploy is live, finish what
+        you can'. Runs every get_next_steps item with runnable: true (open items whose
+        call is free, safe to repeat and needs no value a person holds: verify_site,
+        add_bing_site, verify_bing_site, submit_sitemap, issue_indexnow_key,
+        set_up_web_analytics, add_default_alerts, redeliver_alert, start_crawl), one
+        after another through the same checks as a direct call, and reports each: ran
+        with its result, or failed with the error and its code. A call several items
+        name runs once. Items with runnable: false are left alone; their precondition
+        says what they wait for (a value only a person has, a paid or chosen setting, an
+        action outside Seolyticize). dryRun lists what would run and calls nothing. Then
+        call get_next_steps for what is left. Free."""
+        return self.call("run_next_steps", _present({"clientId": client_id, "dryRun": dry_run}))
 
     def save_ai_visibility_setup(self, *, client_id: str, add_prompts: Optional[List[Dict[str, Any]]] = None, update_prompts: Optional[List[Dict[str, Any]]] = None, retire_prompt_ids: Optional[List[str]] = None, add_brands: Optional[List[Dict[str, Any]]] = None, dry_run: Optional[bool] = None) -> Any:
         """Change what AI visibility tracks. Adds questions (each optionally with a
@@ -6262,12 +6315,14 @@ class Tools:
         completes everything in one call: the IndexNow key file, Google ownership (and
         then adds and connects the Search Console property, with its sixteen months of
         history), whether analytics has received its first event, that robots.txt and
-        the sitemap answer, and starts the first crawl. A sitemap gets 20 s, and after a
-        timeout one more try of 60 s; one slower than 10 s, or that never answers, is
-        code slow_sitemap (optional when it answered, todo when not), with observed
-        {url, elapsedMs, timeoutMs, retried}. Returns a checklist where every item not
-        done carries the exact fix and the next call. Safe to call again; a deployer key
-        may call it. Free."""
+        the sitemap answer, whether Googlebot, Bingbot, GPTBot, ClaudeBot and
+        PerplexityBot are served the home page as a browser is (ai_crawler_blocked,
+        search_crawler_blocked), and starts the first crawl. A sitemap gets 20 s, and
+        after a timeout one more try of 60 s; one slower than 10 s, or that never
+        answers, is code slow_sitemap (optional when it answered, todo when not), with
+        observed {url, elapsedMs, timeoutMs, retried}. Returns a checklist where every
+        item not done carries the exact fix and the next call. Safe to call again; a
+        deployer key may call it. Free."""
         return self.call("verify_site", _present({"clientId": client_id, "recheck": recheck}))
 
     def verify_site_ownership(self, *, client_id: str, method: Optional[Literal["file", "meta", "dns"]] = None, site_url: Optional[str] = None, add_owners: Optional[List[str]] = None) -> Any:

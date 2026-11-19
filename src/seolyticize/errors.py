@@ -54,7 +54,7 @@ class NotFoundError(SeolyticizeError):
 
 
 class RefusedError(SeolyticizeError):
-    """422: a valid request the product declined; ``message`` says why, ``next`` what to do."""
+    """402, 409 or 422: a valid request the product declined; ``message`` says why, ``next`` what to do."""
 
 
 class RateLimitError(SeolyticizeError):
@@ -74,7 +74,7 @@ class NetworkError(SeolyticizeError):
 
 
 def error_for_status(status: int, message: str, **kwargs) -> SeolyticizeError:
-    kinds = {400: ValidationError, 401: AuthenticationError, 403: PermissionError, 404: NotFoundError, 422: RefusedError}
+    kinds = {400: ValidationError, 401: AuthenticationError, 403: PermissionError, 404: NotFoundError, 402: RefusedError, 409: RefusedError, 422: RefusedError}
     if status == 429:
         return RateLimitError(message, status=status, **kwargs)
     if status >= 500:

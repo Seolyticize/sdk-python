@@ -14,7 +14,7 @@ from ._tools import READ_ONLY_TOOLS, Tools
 from .errors import NetworkError, RateLimitError, SeolyticizeError, error_for_status
 
 DEFAULT_BASE_URL = "https://seolyticize.com"
-VERSION = "0.5.15"
+VERSION = "0.5.16"
 #: How many times a call that answered 202 is collected before giving up: ten minutes at 5 s.
 MAX_POLLS = 120
 
@@ -90,11 +90,15 @@ class Seolyticize(Tools):
             except urllib.error.HTTPError as failure:
                 self._remember_rate(failure.headers)
                 status = failure.code
+                body = _body(failure)
+                # A refusal as data answers 402, 409 or 422 with ok:false: the same answer a 200 carried before.
+                if 400 <= status < 500 and body.get("ok") is False:
+                    return body.get("data", body)
                 if status == 409 and polls > 0:  # our own key, still running
                     self._wait_for(key, polls, tool, _float(failure.headers.get("retry-after")))
                     polls += 1
                     continue
-                details = _details(failure)
+                details = _details(failure, body)
                 retry_after = _float(failure.headers.get("retry-after"))
                 can_retry = attempt < self.max_retries
                 if status == 429 and can_retry and (retry_after or 0) <= self.max_retry_after:
@@ -146,11 +150,15 @@ class Seolyticize(Tools):
         return self._request("GET", f"/api/v1/tools{query}", None, None, True)
 
 
-def _details(failure: urllib.error.HTTPError) -> Dict[str, Optional[str]]:
+def _body(failure: urllib.error.HTTPError) -> Dict[str, Any]:
     try:
         body = json.loads(failure.read().decode("utf-8") or "{}")
     except Exception:  # an HTML error page from a proxy
-        body = {}
+        return {}
+    return body if isinstance(body, dict) else {}
+
+
+def _details(failure: urllib.error.HTTPError, body: Dict[str, Any]) -> Dict[str, Optional[str]]:
     text = lambda value: value if isinstance(value, str) and value else None  # noqa: E731
     return {
         "message": text(body.get("error")) or f"HTTP {failure.code}",

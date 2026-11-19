@@ -68,6 +68,12 @@ class ClientTests(unittest.TestCase):
         error = caught.exception
         self.assertEqual((error.status, error.code, error.next, error.request_id), (422, "search_console_no_access", "verify_site", "req_1"))
 
+    def test_a_4xx_refusal_as_data_reads_like_the_old_200(self):
+        declined = {"ok": False, "refused": "not-connected", "data": {"refused": "not-connected"}}
+        self.fake.answers.append((409, declined, {}))
+        self.assertEqual(self.fake.client().get_next_steps(client_id="c"), {"refused": "not-connected"})
+        self.assertEqual(len(self.fake.requests), 1)
+
     def test_rate_limit_is_retried(self):
         self.fake.answers.append((429, {"error": "Slow down", "code": "rate_limited"}, {"Retry-After": "1"}))
         self.fake.answers.append((200, {"data": {"ok": True}}, {}))
