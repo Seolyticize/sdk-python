@@ -153,6 +153,7 @@ READ_ONLY_TOOLS = frozenset({
     "get_robots_history",
     "get_run_status",
     "get_scheduled_work",
+    "get_score_history",
     "get_search_anomalies",
     "get_search_appearance",
     "get_search_changes",
@@ -177,6 +178,7 @@ READ_ONLY_TOOLS = frozenset({
     "get_site_conventions",
     "get_site_status",
     "get_template_report",
+    "get_tenant_summary",
     "get_top_searches",
     "get_topical_authority",
     "get_translation_gap",
@@ -270,7 +272,7 @@ READ_ONLY_TOOLS = frozenset({
     "whoami",
 })
 
-TOOL_COUNT = 539
+TOOL_COUNT = 544
 
 
 def _present(values: Dict[str, Any]) -> Dict[str, Any]:
@@ -321,7 +323,9 @@ class Tools:
         site is returned as it is. added is true only when this call added the site;
         existed is true when it was already in the account, and addedBy names the call
         that added it (onboard_site adds it when Bing is connected; null when it was
-        added outside Seolyticize). Free."""
+        added outside Seolyticize). When the site cannot be added the answer is a
+        refusal instead, {refused, reason}: not-connected (no Bing key, or Bing rejected
+        it) or vendor-refused (Bing's own reason). Free."""
         return self.call("add_bing_site", _present({"clientId": client_id}))
 
     def add_competitors(self, *, client_id: str, tracker_id: str, domains: List[str]) -> Any:
@@ -448,9 +452,10 @@ class Tools:
         files (the IndexNow key and Google verification file, which are public) come
         back on every real run. env lists each environment variable to set: build (read
         at build time), runtime and secrets, with public ids as values and secrets only
-        as a placeholder naming the tool that issues them. A new deploy hook's secret is
-        in its step's result only, once. A deployer key may run it with dryRun only.
-        Free."""
+        as a placeholder naming the tool that issues them; with deployHook {source:
+        'coolify'} it lists no hook variables and next says where to add Coolify's team
+        webhook. A new deploy hook's secret is in its step's result only, once. A
+        deployer key may run it with dryRun only. Free."""
         return self.call("apply_manifest", _present({"domain": domain, "name": name, "framework": framework, "verification": verification, "trackerFrequency": tracker_frequency, "firstCrawl": first_crawl, "monthlyBudgetUsd": monthly_budget_usd, "budgetAlertAt": budget_alert_at, "domainSweep": domain_sweep, "deployHook": deploy_hook, "healthKey": health_key, "brief": brief, "analytics": analytics, "crawl": crawl, "alerts": alerts, "pathOwners": path_owners, "platforms": platforms, "environments": environments, "facts": facts, "goals": goals, "funnels": funnels, "dryRun": dry_run}))
 
     def archive_client(self, *, client_id: str) -> Any:
@@ -835,8 +840,10 @@ class Tools:
         host for self-hosted, with /api left off. The last 30 days are imported straight
         away; tools that only give totals (Plausible, Fathom) use import_analytics_csv.
         Needs set_up_web_analytics first. Don't also run our tag on the same pages, or
-        visits count twice. Answers 'use our PostHog for traffic' or 'we measure with
-        Datadog, not your tag'. Free."""
+        visits count twice; splitting by path is supported (the tag with data-include on
+        marketing and sign-up pages for the visit token, the other tool in the signed-in
+        app). Answers 'use our PostHog for traffic' or 'we measure with Datadog, not
+        your tag'. Free."""
         return self.call("connect_analytics_source", _present({"clientId": client_id, "provider": provider, "project": project, "key": key, "appKey": app_key, "host": host}))
 
     def connect_external_events(self, *, client_id: str, sender: str, sender_secret: Optional[str] = None, events: Optional[Dict[str, Any]] = None) -> Any:
@@ -1001,7 +1008,7 @@ class Tools:
         estimate_cost. Answers 'tell me when rankings drop'."""
         return self.call("create_alert_rule", _present({"clientId": client_id, "kind": kind, "threshold": threshold, "cooldownHours": cooldown_hours, "webhookUrl": webhook_url, "channel": channel, "emailRecipients": email_recipients, "telegramChatId": telegram_chat_id, "apiKey": api_key, "botToken": bot_token, "watchtowerProjectId": watchtower_project_id, "hermeticaFrom": hermetica_from, "paidSource": paid_source}))
 
-    def create_api_key(self, *, name: str, client_id: Optional[str] = None, role: Optional[Literal["client_viewer", "analyst", "manager", "site_admin", "deployer", "admin"]] = None, expires_in_days: Optional[int] = None, max_cost_usd_per_call: Optional[float] = None, mode: Optional[Literal["live", "test"]] = None, allowed_cidrs: Optional[List[str]] = None) -> Any:
+    def create_api_key(self, *, name: str, client_id: Optional[str] = None, role: Optional[Literal["client_viewer", "analyst", "manager", "site_admin", "deployer", "provisioner", "admin", "tenant_viewer"]] = None, expires_in_days: Optional[int] = None, max_cost_usd_per_call: Optional[float] = None, mode: Optional[Literal["live", "test"]] = None, allowed_cidrs: Optional[List[str]] = None, tenant: Optional[str] = None, client_name_prefix: Optional[str] = None, max_monthly_budget_usd: Optional[float] = None) -> Any:
         """Create an API key. Mints an API key, agency-wide or pinned to one client, with a
         role: client_viewer (read-only, the reader role), analyst, manager, site_admin,
         deployer or admin. deployer is for a CI pipeline and needs a clientId: it reads
@@ -1010,14 +1017,24 @@ class Tools:
         its own key'. For an agent that runs one site, pin it to that client with
         site_admin: full control of that client — connecting consoles, crawls,
         onboarding — and none of the agency's settings, team, keys or billing; the key
-        cannot even see other clients. A client-pinned key is at most site_admin, and
-        site_admin needs a clientId. expiresInDays makes it stop working on its own;
-        maxCostUsdPerCall caps what any one call with it may spend; allowedCidrs limits
-        where it may be used from. For handing a site its key, an invite code
-        (create_invite_code, claimed at /api/v1/claim) that expires is safer than
-        pasting a key into a guide or chat. The key is in the response once and can
-        never be shown again. A key cannot be given more access than the caller has."""
-        return self.call("create_api_key", _present({"name": name, "clientId": client_id, "role": role, "expiresInDays": expires_in_days, "maxCostUsdPerCall": max_cost_usd_per_call, "mode": mode, "allowedCidrs": allowed_cidrs}))
+        cannot even see other clients. For a multi-tenant product's tenant (a creator, a
+        shop: the tenant field sent to /api/collect), tenant_viewer with clientId and
+        tenant reads only that tenant, through query_data (narrowed to it) and
+        get_tenant_summary, and is refused every other tool and tenant with 403. A
+        client-pinned key is at most site_admin, and site_admin needs a clientId.
+        provisioner is for a backend or agent that onboards sites: agency-wide with no
+        clientId, it creates clients (create_client, onboard_site) and is site_admin on
+        each one it created, can pin keys to those, and cannot see or list any other
+        client; clientNamePrefix limits the names it may give and maxMonthlyBudgetUsd
+        the budget it may set (its clients start with that budget). A key pinned to one
+        client with role client_viewer is that client's read key. expiresInDays makes it
+        stop working on its own; maxCostUsdPerCall caps what any one call with it may
+        spend; allowedCidrs limits where it may be used from. For handing a site its
+        key, an invite code (create_invite_code, claimed at /api/v1/claim) that expires
+        is safer than pasting a key into a guide or chat. The key is in the response
+        once and can never be shown again. A key cannot be given more access than the
+        caller has."""
+        return self.call("create_api_key", _present({"name": name, "clientId": client_id, "role": role, "expiresInDays": expires_in_days, "maxCostUsdPerCall": max_cost_usd_per_call, "mode": mode, "allowedCidrs": allowed_cidrs, "tenant": tenant, "clientNamePrefix": client_name_prefix, "maxMonthlyBudgetUsd": max_monthly_budget_usd}))
 
     def create_business_post(self, *, client_id: str, summary: str, location_id: Optional[str] = None, call_to_action: Optional[Dict[str, Any]] = None, dry_run: Optional[bool] = None) -> Any:
         """Publish a Google Business Profile post. Publishes an update post (topic
@@ -1032,12 +1049,25 @@ class Tools:
         Answers 'post this offer on our Google listing'. Free."""
         return self.call("create_business_post", _present({"clientId": client_id, "locationId": location_id, "summary": summary, "callToAction": call_to_action, "dryRun": dry_run}))
 
-    def create_client(self, *, name: str, domain: str, keywords: Optional[List[str]] = None, monthly_budget_usd: Optional[float] = None) -> Any:
-        """Create a client. Onboards a client in one step: the client, a project, its site
-        and a rank tracker, optionally with keywords to track. Answers 'set up a new
-        client'. Refused when the name is taken or the plan's client or keyword
-        allowance is used up; every tracked keyword is a paid lookup on every run."""
-        return self.call("create_client", _present({"name": name, "domain": domain, "keywords": keywords, "monthlyBudgetUsd": monthly_budget_usd}))
+    def create_client(self, *, name: str, kind: Optional[Literal["site", "analytics"]] = None, domain: Optional[str] = None, path_prefix: Optional[str] = None, external_ref: Optional[str] = None, keywords: Optional[List[str]] = None, monthly_budget_usd: Optional[float] = None) -> Any:
+        """Create a client. Onboards a client in one step: the client, a project, its site,
+        a rank tracker (empty unless keywords are given; an empty tracker buys nothing)
+        and the four default alerts to the agency owner's email. Without keywords
+        nothing is paid for, whatever the vendor balance. For a site with analytics,
+        Search Console and IndexNow too, onboard_site does it all, and onboard_site
+        {dryRun: true} lists what it would make without writing anything. Answers 'set
+        up a new client'. pathPrefix (or a domain with a path,
+        shop.example/storefront/a) makes a site of that path alone: its crawl, IndexNow
+        key file and analytics stay under it. kind analytics makes a client for
+        first-party analytics alone: no domain, so no crawl, rank tracker or Search
+        Console, and get_next_steps lists only the analytics steps; set_up_web_analytics
+        with hostnames then sets up its collection. externalRef is your own id for the
+        client (a shop or tenant id): create_client with an externalRef already used
+        returns that client (created: false) instead of making another, and list_clients
+        finds it by externalRef. Refused when the name is taken or the plan's client or
+        keyword allowance is used up; every tracked keyword is a paid lookup on every
+        run."""
+        return self.call("create_client", _present({"name": name, "kind": kind, "domain": domain, "pathPrefix": path_prefix, "externalRef": external_ref, "keywords": keywords, "monthlyBudgetUsd": monthly_budget_usd}))
 
     def create_data_sync(self, *, client_id: str, destination: Literal["google_sheets", "airtable", "bigquery"], name: str, query: Dict[str, Any], mode: Optional[Literal["append", "replace"]] = None, window_days: Optional[int] = None, cadence: Optional[Literal["daily", "weekly", "monthly"]] = None, run_hour: Optional[int] = None, spreadsheet_id: Optional[str] = None, sheet: Optional[str] = None, base_id: Optional[str] = None, table: Optional[str] = None, project_id: Optional[str] = None, dataset_id: Optional[str] = None, table_id: Optional[str] = None) -> Any:
         """Sync data to a sheet, base or warehouse. Copies any dataset query (the
@@ -1087,9 +1117,11 @@ class Tools:
         thank-you. Measured within one visit, because the cookieless visitor id resets
         daily; get_funnel_report with acrossVisits measures it across a signed-in user's
         visits instead, where the site sends uid. Pageview and event steps mix in any
-        order; each step must happen after the one before it in the visit. Labels are
-        optional and need not be unique (the report names a step by its label, else its
-        match). Answers 'how many who see pricing go on to sign up'. Free."""
+        order, as {kind, match} objects: [{kind: 'pageview', match: '/'}, {kind:
+        'pageview', match: '/signup'}, {kind: 'event', match: 'Signup'}]; each step must
+        happen after the one before it in the visit. Labels are optional and need not be
+        unique (the report names a step by its label, else its match). Answers 'how many
+        who see pricing go on to sign up'. Free."""
         return self.call("create_funnel", _present({"clientId": client_id, "name": name, "steps": steps, "upsertBy": upsert_by, "dryRun": dry_run}))
 
     def create_goal(self, *, client_id: str, name: str, kind: Literal["pageview", "event"], match: str, value_minor: Optional[int] = None, allowed_props: Optional[List[str]] = None, upsert_by: Optional[Literal["name"]] = None, dry_run: Optional[bool] = None) -> Any:
@@ -1269,6 +1301,14 @@ class Tools:
         update_alert_rule instead. Safe to repeat."""
         return self.call("delete_alert_rule", _present({"clientId": client_id, "ruleId": rule_id}))
 
+    def delete_client(self, *, client_id: str, confirm: bool) -> Any:
+        """Delete a client for good. Deletes a client and everything stored under it:
+        projects, sites, trackers, settings, keys pinned to it. For a client made by
+        mistake or for a test. Refused (client_has_paid_history) when any call for it
+        ever cost money: archive_client keeps that history instead. Cannot be undone, so
+        confirm must be true. Answers 'remove this test client completely'. Free."""
+        return self.call("delete_client", _present({"clientId": client_id, "confirm": confirm}))
+
     def delete_data_sync(self, *, client_id: str, sync_id: str) -> Any:
         """Delete a data sync. Stops and removes a sync. What it already wrote stays where
         it is. Answers 'stop the Airtable sync'. Safe to repeat."""
@@ -1353,8 +1393,9 @@ class Tools:
     def describe_tool(self, *, name: str) -> Any:
         """One tool's schema. One tool's description and JSON input schema: the entry GET
         /api/v1/tools lists for it (also GET /api/v1/tools/{name}), without reading the
-        whole catalogue. Only tools this key may call. Answers 'what arguments does
-        onboard_site take'. Free."""
+        whole catalogue. Only tools this key may call: for one it may not, the refusal
+        (code not_permitted) names the permission it needs and the roles that hold it.
+        Answers 'what arguments does onboard_site take'. Free."""
         return self.call("describe_tool", _present({"name": name}))
 
     def disconnect_app(self, *, grant_id: str) -> Any:
@@ -1653,6 +1694,17 @@ class Tools:
         arriving over 60 days. Answers 'how much traffic should we expect next quarter'
         and 'what is the striking-distance work worth'. Free."""
         return self.call("forecast_search_clicks", _present({"clientId": client_id, "horizonDays": horizon_days, "trends": trends, "scenario": scenario}))
+
+    def forget_tenant(self, *, client_id: str, tenant: str) -> Any:
+        """Erase one tenant's analytics. Deletes every analytics event a client's site
+        stored for one tenant (the tenant field sent to /api/collect), and the orders
+        recorded with them, when a SaaS's creator or shop deletes their account. Answers
+        with how many events were removed; the rows stop being read at once and leave
+        disk as the warehouse merges. A large tenant may answer 202 with a jobId:
+        wait_for_job gives the result. Recorded in the audit trail (list_audit_events).
+        Not reversible. Safe to repeat: a tenant with nothing left answers removed 0.
+        Free."""
+        return self.call("forget_tenant", _present({"clientId": client_id, "tenant": tenant}))
 
     def forget_user(self, *, client_id: str, uid: str) -> Any:
         """Erase one user's analytics. Deletes every analytics event carrying this uid (the
@@ -2058,7 +2110,9 @@ class Tools:
         stages counts each issue's findings by the HTML they came from: raw (the page as
         served; it was not rendered), rendered (only after JavaScript ran: hydration,
         not the template, caused it) or both; content-lost-on-render names pages whose
-        JavaScript removes words, the title, canonical or H1 the raw HTML had, and
+        raw HTML and rendered page disagree (words removed, or a different title,
+        canonical or H1, both values shown: a route with prerendering off among others;
+        render: "shells" renders one page per template, up to 10, to check), and
         shared-shell routes that all answer with one document. fixes groups the same
         findings by URL template (the client's analytics pathTemplates, then paths that
         differ in one segment under a common prefix, /templates/*): one row per rule and
@@ -2171,7 +2225,9 @@ class Tools:
         """Read the agency's plan. The agency's plan, its limits, how many clients it uses,
         and the subscription's status and renewal date. Answers 'how many more clients
         can we add'. `configured` is false where this deployment sells nothing — every
-        agency is on the trial plan then, and that is not an error."""
+        agency is on the trial plan then, and that is not an error. billing.warnings
+        carries vendor_balance_empty while the agency's DataForSEO balance is at or
+        below zero: the plan is not the problem then, the data account is."""
         return self.call("get_billing", {})
 
     def get_billing_link(self, *, plan: Optional[Literal["studio", "agency", "network"]] = None) -> Any:
@@ -2855,9 +2911,12 @@ class Tools:
         channel, landing page, source, campaign, the AI assistant that referred the
         visit, or the Search Console query cluster bringing people to the landing page.
         Conversions and value joined to no visit (a server event sent without ip, ua or
-        visit token) are their own (unattributed) row. Answers 'which channel brings
-        sign-ups', 'what is organic search worth in conversions', 'do visits from
-        ChatGPT convert'. Free."""
+        visit token) are their own (unattributed) row. totals.attributedBy counts how
+        conversions found their visit: token (a visit token sent with them), address
+        (joined to a visit in progress by ip and user agent) or none, with tokenShare; a
+        sign-up sent by Atlas or a webhook with a low tokenShare is not getting the
+        page's visit token. Answers 'which channel brings sign-ups', 'what is organic
+        search worth in conversions', 'do visits from ChatGPT convert'. Free."""
         return self.call("get_goal_report", _present({"clientId": client_id, "goalIds": goal_ids, "by": by, "days": days, "limit": limit}))
 
     def get_google_service_account(self) -> Any:
@@ -2986,9 +3045,12 @@ class Tools:
         domain refresh, a performance run: its status (queued, running, done, failed),
         progress, an ETA where one can be told, and the tool that reads the finished
         result. jobId is kind:id — crawl:<crawlId> (from start_crawl), rank:<runId>
-        (refresh_rankings), domain:<runId> (refresh_domain_data), performance:<runId>.
-        An AI visibility check reports through get_ai_visibility_runs. Answers 'is my
-        crawl done'. Free."""
+        (refresh_rankings), domain:<runId> (refresh_domain_data), performance:<runId>,
+        and call:<key> (the jobId a REST call answered 202 gives: done carries its
+        answer as result, with httpStatus). A queued crawl has queuePosition and
+        etaSeconds (from the median wait of recent crawls) or, when no ETA can be told,
+        startsAfter: the crawl of yours it waits behind. An AI visibility check reports
+        through get_ai_visibility_runs. Answers 'is my crawl done'. Free."""
         return self.call("get_job", _present({"clientId": client_id, "jobId": job_id}))
 
     def get_keyword_advertisers(self, *, client_id: str, keyword: str, location_code: Optional[int] = None, language_code: Optional[str] = None, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
@@ -3627,6 +3689,17 @@ class Tools:
         schedule, and how do I stop it'. Free."""
         return self.call("get_scheduled_work", _present({"clientId": client_id}))
 
+    def get_score_history(self, *, client_id: str, limit: Optional[int] = None) -> Any:
+        """Site health score over time. The site's health score per complete crawl, newest
+        first: crawlId, date (when the crawl started), score (0–100: the share of
+        crawled pages with no critical issue, the audit's health score; null when the
+        crawl read no pages), pagesCrawled, pagesWithErrors and issue counts by severity
+        (critical, warning, notice). Read from what each crawl stored, so nothing is
+        recomputed and failed or running crawls are left out. Answers 'is the site
+        getting healthier' and 'chart the score'. get_seo_scorecard is the weighted
+        scorecard of one crawl. Free."""
+        return self.call("get_score_history", _present({"clientId": client_id, "limit": limit}))
+
     def get_search_anomalies(self, *, client_id: str, lookback_days: Optional[int] = None, scopes: Optional[List[Literal["site", "section", "topic"]]] = None) -> Any:
         """Unusual days in search traffic, explained. Days when Google clicks fell or
         jumped well outside their normal range — for the whole site, each section (first
@@ -3923,8 +3996,11 @@ class Tools:
         the deploy hook sitemaps read on it and whether the crawl covers it; and
         blocked: what stops data collection for the whole agency now
         (vendor_balance_empty while its DataForSEO balance is at or below zero), with
-        blockedDetail. Answers 'is this site set up and verified' and 'which hosts does
-        Seolyticize watch'."""
+        blockedDetail; and warnings: what reads wrong but blocks nothing
+        (sitemap_lastmod_build_time: every page in the sitemaps the deploy hook last
+        read has one lastmod, the build time, so only new pages count as changed). A
+        path site's sites entry carries its pathPrefix. Answers 'is this site set up and
+        verified' and 'which hosts does Seolyticize watch'."""
         return self.call("get_site_status", _present({"clientId": client_id}))
 
     def get_snippet_targets(self, *, client_id: str, limit: Optional[int] = None, draft: Optional[bool] = None, read_missing: Optional[bool] = None, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
@@ -3997,6 +4073,18 @@ class Tools:
         'which template is broken', 'which listings sold' and 'how fast are Forumulate's
         pages'. Free."""
         return self.call("get_template_report", _present({"clientId": client_id, "crawlId": crawl_id, "limit": limit}))
+
+    def get_tenant_summary(self, *, client_id: str, tenant: str, from_: str, to: str, compare: Optional[Literal["previous_period", "none"]] = None, breakdowns: Optional[List[Literal["country", "device", "source", "referrer", "path", "host", "browser", "os", "campaign"]]] = None, events: Optional[Dict[str, Any]] = None, limit: Optional[int] = None) -> Any:
+        """One tenant's analytics. One tenant of a multi-tenant product (the tenant field
+        sent to /api/collect: a creator, a shop) over a range of days: totals (views,
+        visitors, visits, clicks, conversions), the same for the period just before
+        (compare: previous_period), a daily series with every day present, and
+        breakdowns (country, device, source by default; also referrer, path, host,
+        browser, os, campaign), top rows by views. clicks and conversions count the
+        custom events named in events.clicks and events.conversions. Answers 'how did
+        this creator's page do this month'. A tenant_viewer key reads only its own
+        tenant; another tenant answers 403. Free."""
+        return self.call("get_tenant_summary", _present({"clientId": client_id, "tenant": tenant, "from": from_, "to": to, "compare": compare, "breakdowns": breakdowns, "events": events, "limit": limit}))
 
     def get_top_pages(self, *, client_id: str, target: Optional[str] = None, scope: Optional[Literal["auto", "domain", "subdomains", "subfolder", "url"]] = None, limit: Optional[int] = None, location_code: Optional[int] = None, language_code: Optional[str] = None, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
         """A domain's pages by traffic. A domain's (or subfolder's) pages ranked by
@@ -4300,16 +4388,20 @@ class Tools:
         their volume says'. Free."""
         return self.call("get_zero_click_estimates", _present({"clientId": client_id, "days": days, "limit": limit}))
 
-    def import_analytics_csv(self, *, client_id: str, source: Literal["plausible", "umami"], csv: str, dry_run: Optional[bool] = None) -> Any:
+    def import_analytics_csv(self, *, client_id: str, source: Literal["plausible", "umami", "rows"], csv: str, dry_run: Optional[bool] = None) -> Any:
         """Import visits from Plausible or Umami. Imports daily visitors, visits and
         pageviews from another analytics tool's CSV export, so the months before
         Seolyticize's tag was installed are not empty: Plausible's imported_visitors.csv
         (or visitors.csv) from its export zip, or Umami's website_event.csv (counted per
-        day) or a daily table with date, visitors and pageviews. Only daily totals are
-        imported, not pages or sources. Imported days show in get_web_analytics_summary
-        only before the site's own first event; importing a day again replaces it.
-        Answers with the days, range and totals read and the lines skipped. Refuses with
-        a sentence when web analytics has not been set up for the client. Free."""
+        day) or a daily table with date, visitors and pageviews. From those, only daily
+        totals are imported, not pages or sources. Or source rows: a multi-tenant
+        product's own per-tenant, per-path daily counts, header date, tenant and/or
+        path, event (pageview when left out), pageviews and visitors, kept flagged
+        imported and read by get_tenant_summary on a tenant's days with no events of
+        their own. Imported days show in get_web_analytics_summary only before the
+        site's own first event; importing a day again replaces it. Answers with the
+        days, range and totals read and the lines skipped. Refuses with a sentence when
+        web analytics has not been set up for the client. Free."""
         return self.call("import_analytics_csv", _present({"clientId": client_id, "source": source, "csv": csv, "dryRun": dry_run}))
 
     def import_analytics_now(self, *, client_id: str) -> Any:
@@ -4387,11 +4479,11 @@ class Tools:
         issuing another revokes the last, at once or, with graceHours, once
         previousKeyExpiresAt passes, so a rotation never drops events while the new key
         rolls out. Also returns proxy: the X-Seolyticize-Proxy header value a
-        first-party proxy (a.js with data-api="/s/e" on the site's own domain) sends so
-        its forwarded X-Forwarded-For and X-Seolyticize-Country are believed; it rotates
-        with the key. Answers 'track visits from our server', 'rotate the collect key',
-        'proxy the tag through our own domain' and 'count AI agents reading our pages'.
-        Free."""
+        first-party proxy (a.js with data-api="/_sa/e" on the site's own domain) sends
+        so its forwarded X-Forwarded-For and X-Seolyticize-Country are believed; it
+        rotates with the key. Answers 'track visits from our server', 'rotate the
+        collect key', 'proxy the tag through our own domain' and 'count AI agents
+        reading our pages'. Free."""
         return self.call("issue_server_collect_key", _present({"clientId": client_id, "graceHours": grace_hours}))
 
     def issue_site_verification(self, *, client_id: str, method: Optional[Literal["file", "meta", "dns"]] = None, site_url: Optional[str] = None) -> Any:
@@ -4482,17 +4574,19 @@ class Tools:
         repeat. Free."""
         return self.call("link_content_platform", _present({"clientId": client_id, "kind": kind, "host": host, "sitemapUrl": sitemap_url, "org": org, "mounts": mounts, "apiKey": api_key}))
 
-    def link_sibling_platforms(self, *, client_id: str, atlas: Optional[Dict[str, Any]] = None, cookie_munch: Optional[Dict[str, Any]] = None, watchtower: Optional[Dict[str, Any]] = None, hermetica: Optional[Dict[str, Any]] = None, referalli: Optional[Dict[str, Any]] = None, dry_run: Optional[bool] = None) -> Any:
+    def link_sibling_platforms(self, *, client_id: str, atlas: Optional[Dict[str, Any]] = None, cookie_munch: Optional[Dict[str, Any]] = None, watchtower: Optional[Dict[str, Any]] = None, hermetica: Optional[Dict[str, Any]] = None, referalli: Optional[Dict[str, Any]] = None, forumulate: Optional[Dict[str, Any]] = None, dry_run: Optional[bool] = None) -> Any:
         """Link the client's Atlas, Cookie Munch, Watchtower, Hermetica and Referalli.
         Records in one call which sibling products the client's site runs on: atlas
         {clientId} (its Atlas OIDC client id), cookieMunch {org}, watchtower {projectId,
         apiKey} (through link_watchtower: alerts go there and it owns uptime; apiKey
         only when the project is not linked already), hermetica {sender} (the verified
-        sender address) and referalli {programId}. A product left out is kept, null
-        unlinks it. Ids only: no other secret is taken or stored. verify_site lists what
-        is linked. dryRun: true writes nothing and answers the same. Answers 'connect
-        this client to our other products'. Free."""
-        return self.call("link_sibling_platforms", _present({"clientId": client_id, "atlas": atlas, "cookieMunch": cookie_munch, "watchtower": watchtower, "hermetica": hermetica, "referalli": referalli, "dryRun": dry_run}))
+        sender address), referalli {programId} and forumulate {org} (the Forumulate org:
+        get_next_steps then proposes the partner paths and robots.txt sitemap lines of
+        each space it mounts on the client's host that are not listed yet). A product
+        left out is kept, null unlinks it. Ids only: no other secret is taken or stored.
+        verify_site lists what is linked. dryRun: true writes nothing and answers the
+        same. Answers 'connect this client to our other products'. Free."""
+        return self.call("link_sibling_platforms", _present({"clientId": client_id, "atlas": atlas, "cookieMunch": cookie_munch, "watchtower": watchtower, "hermetica": hermetica, "referalli": referalli, "forumulate": forumulate, "dryRun": dry_run}))
 
     def link_watchtower(self, *, client_id: str, project_id: Optional[str], api_key: Optional[str] = None) -> Any:
         """Link the client's Watchtower project. Links a client to its Watchtower project
@@ -4557,13 +4651,14 @@ class Tools:
         client'. Free."""
         return self.call("list_client_facts", _present({"clientId": client_id}))
 
-    def list_clients(self, *, domain: Optional[str] = None) -> Any:
+    def list_clients(self, *, domain: Optional[str] = None, external_ref: Optional[str] = None) -> Any:
         """List clients. Lists every client the caller can access, each with its site
-        domains. Use this first when a request names a client by name or domain rather
-        than id; domain narrows it to the client whose site is on that domain (www. and
-        the scheme are ignored), which is how a provisioning script checks whether a
-        site is onboarded already."""
-        return self.call("list_clients", _present({"domain": domain}))
+        domains, kind (site, or analytics: no domain) and externalRef. Use this first
+        when a request names a client by name or domain rather than id; domain narrows
+        it to the client whose site is on that domain (www. and the scheme are ignored),
+        which is how a provisioning script checks whether a site is onboarded already,
+        and externalRef to the client created with that id of yours."""
+        return self.call("list_clients", _present({"domain": domain, "externalRef": external_ref}))
 
     def list_collect_keys(self, *, client_id: str) -> Any:
         """Server collect keys and their last use. The client's server collect keys, never
@@ -4907,25 +5002,26 @@ class Tools:
         much); quote it with estimate_cost. Can spend: pass max_cost_micros to cap it."""
         return self.call("mine_app_reviews", _present({"clientId": client_id, "store": store, "appId": app_id, "locationCode": location_code, "languageCode": language_code, "limit": limit, "taskId": task_id, "maxCostMicros": max_cost_micros, "dryRun": dry_run}))
 
-    def move_site(self, *, client_id: str, new_domain: str, verification: Optional[Literal["file", "meta", "dns"]] = None, overlap_days: Optional[int] = None) -> Any:
+    def move_site(self, *, client_id: str, new_domain: str, verification: Optional[Literal["file", "meta", "dns"]] = None, overlap_days: Optional[int] = None, also_clients: Optional[List[str]] = None) -> Any:
         """Move a client to a new domain. Answers 'the site moved to a new domain'. Keeps
         the client, its history and its analytics site key, and moves everything that
         follows the domain: the site, its rank trackers (frequency unchanged), its own
         brand in AI visibility, the IndexNow key, the analytics hostnames (the old ones
-        are still accepted for overlapDays, then refused), and the deploy hook (same
-        URL; sitemaps on the old domain follow, others are listed in otherHosts; its
-        next call records a fresh baseline). Never changes the budget or the domain
-        sweep. notMoved names what cannot follow, with the next step. Safe to repeat: a
-        second call answers alreadyMoved: true with the same manifest and changes
-        nothing. Issues a Google verification for the new domain and returns the deploy
-        manifest to put on it (IndexNow key file, verification file, tag or TXT record),
-        and adds a 'Domain moved' note to the timeline. When the new domain already
-        proves ownership (a DNS TXT record added beforehand), it connects the new Search
-        Console property at once, as a Domain property; searchConsoleProperty says
-        which, or names verify_site. Otherwise deploy the manifest on the new domain and
-        call verify_site, which verifies it and adds the property. The order of every
-        step: https://seolyticize.com/docs/move-a-site. Free."""
-        return self.call("move_site", _present({"clientId": client_id, "newDomain": new_domain, "verification": verification, "overlapDays": overlap_days}))
+        are still accepted for overlapDays, then refused; alsoClients moves the same
+        host in other clients' analytics in the same call, listed in alsoMoved), and the
+        deploy hook (same URL; sitemaps on the old domain follow, others are listed in
+        otherHosts; its next call records a fresh baseline). Never changes the budget or
+        the domain sweep. notMoved names what cannot follow, with the next step. Safe to
+        repeat: a second call answers alreadyMoved: true with the same manifest and
+        changes nothing. Issues a Google verification for the new domain and returns the
+        deploy manifest to put on it (IndexNow key file, verification file, tag or TXT
+        record), and adds a 'Domain moved' note to the timeline. When the new domain
+        already proves ownership (a DNS TXT record added beforehand), it connects the
+        new Search Console property at once, as a Domain property; searchConsoleProperty
+        says which, or names verify_site. Otherwise deploy the manifest on the new
+        domain and call verify_site, which verifies it and adds the property. The order
+        of every step: https://seolyticize.com/docs/move-a-site. Free."""
+        return self.call("move_site", _present({"clientId": client_id, "newDomain": new_domain, "verification": verification, "overlapDays": overlap_days, "alsoClients": also_clients}))
 
     def notify_google_indexing(self, *, client_id: str, urls: List[str], type_: Optional[Literal["URL_UPDATED", "URL_DELETED"]] = None, dry_run: Optional[bool] = None) -> Any:
         """Tell Google a job posting or livestream changed. Sends Google's Indexing API a
@@ -4942,10 +5038,15 @@ class Tools:
         Google the vacancy is filled'."""
         return self.call("notify_google_indexing", _present({"clientId": client_id, "urls": urls, "type": type_, "dryRun": dry_run}))
 
-    def onboard_site(self, *, domain: str, name: Optional[str] = None, framework: Optional[Literal["nextjs", "astro", "remix", "sveltekit", "nuxt", "html", "wordpress", "other", "next"]] = None, keywords: Optional[List[str]] = None, verification: Optional[Literal["file", "meta", "dns"]] = None, health_key: Optional[bool] = None, tracker_frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None, first_crawl: Optional[Literal["now", "afterVerify", "never"]] = None, allow_while_blocked: Optional[bool] = None, dry_run: Optional[bool] = None) -> Any:
-        """Onboard a site in one call. Answers 'set this site up'. Makes the client,
-        project, site and rank tracker — or finds the client already here for this
-        domain, so calling it twice is safe — issues the IndexNow key and a Google site
+    def onboard_site(self, *, domain: str, path_prefix: Optional[str] = None, name: Optional[str] = None, framework: Optional[Literal["nextjs", "astro", "remix", "sveltekit", "nuxt", "html", "wordpress", "other", "next"]] = None, keywords: Optional[List[str]] = None, verification: Optional[Literal["file", "meta", "dns"]] = None, health_key: Optional[bool] = None, tracker_frequency: Optional[Literal["daily", "weekly", "monthly", "manual"]] = None, first_crawl: Optional[Literal["now", "afterVerify", "never"]] = None, allow_while_blocked: Optional[bool] = None, dry_run: Optional[bool] = None) -> Any:
+        """Onboard a site in one call. Answers 'set this site up'. pathPrefix (or a domain
+        given with a path, shop.example/storefront/a) onboards one path of a shared host
+        as a client of its own, never the host's: the crawl starts at the path and stays
+        under it, analytics records only its pages, the rank tracker counts only its
+        URLs and the IndexNow key file is served inside the path (IndexNow scopes a key
+        to its folder, so only the path's pages are sent). Makes the client, project,
+        site and rank tracker — or finds the client already here for this domain, so
+        calling it twice is safe — issues the IndexNow key and a Google site
         verification for the agency's own Google account, sets up cookieless analytics,
         and returns one deploy manifest: files to serve at exact paths, tags for the
         <head>, the analytics snippet placed for the framework given, and CSP entries,
@@ -4954,10 +5055,12 @@ class Tools:
         trackerFrequency says otherwise, and the weekly domain sweep stays off until
         set_domain_sweep). While the agency's DataForSEO balance is empty a new client
         gets no tracker (skipped names the step, code vendor_balance_empty) unless
-        allowWhileBlocked is true; the rest is set up either way. Deploy all of it, then
-        call verify_site. No Google sign-in or Search Console settings are needed at any
-        point. Free."""
-        return self.call("onboard_site", _present({"domain": domain, "name": name, "framework": framework, "keywords": keywords, "verification": verification, "healthKey": health_key, "trackerFrequency": tracker_frequency, "firstCrawl": first_crawl, "allowWhileBlocked": allow_while_blocked, "dryRun": dry_run}))
+        allowWhileBlocked is true; the rest is set up either way. sideEffects lists, in
+        words, what the call changed beyond the manifest: the client it made, the
+        default alerts, and the site added to the agency's Bing Webmaster Tools account
+        when the agency has one. Deploy all of it, then call verify_site. No Google
+        sign-in or Search Console settings are needed at any point. Free."""
+        return self.call("onboard_site", _present({"domain": domain, "pathPrefix": path_prefix, "name": name, "framework": framework, "keywords": keywords, "verification": verification, "healthKey": health_key, "trackerFrequency": tracker_frequency, "firstCrawl": first_crawl, "allowWhileBlocked": allow_while_blocked, "dryRun": dry_run}))
 
     def page_headers(self, *, url: str, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
         """What the server actually returned. Status code, redirect chain, content type and
@@ -5079,12 +5182,15 @@ class Tools:
         tools do not answer: pick a dataset (describe_datasets), group by dimensions,
         compute metrics (count, sum(col), avg(col), min, max, uniq, plus ctr and
         position for Search Console, visitors and visits for analytics), filter (eq,
-        neq, contains, starts_with, gt, lt, in, regex), order and limit — or list rows
-        with columns. Search Console can also be grouped or filtered by each query's
-        intent, topic and branded flag. Answers 'which queries containing X lost clicks
-        on mobile in Spain', 'how many 404s per template', 'how are commercial queries
-        trending'. Read-only and always limited to the client's own data. Up to 10,000
-        rows; export_data for more. Free."""
+        neq, contains, starts_with, gt, lt, in and not_in with a list, regex), order and
+        limit — or list rows with columns. Search Console can also be grouped or
+        filtered by each query's intent, topic and branded flag; web_events by tenant
+        (collect's tenant field), host and any custom-event property as prop:<name>
+        (prop:linkId). Answers 'views and clicks by tenant for these 50 creators',
+        'which queries containing X lost clicks on mobile in Spain', 'how many 404s per
+        template', 'how are commercial queries trending'. Read-only and always limited
+        to the client's own data; a tenant_viewer key's, to web_events of its own
+        tenant. Up to 10,000 rows; export_data for more. Free."""
         return self.call("query_data", _present({"clientId": client_id, "dataset": dataset, "dimensions": dimensions, "metrics": metrics, "columns": columns, "filters": filters, "from": from_, "to": to, "orderBy": order_by, "crawlId": crawl_id, "limit": limit}))
 
     def query_keyword_list(self, *, list_id: str, text: Optional[str] = None, tags: Optional[List[str]] = None, untagged: Optional[bool] = None, intents: Optional[List[Literal["informational", "navigational", "commercial", "transactional"]]] = None, min_volume: Optional[int] = None, max_volume: Optional[int] = None, min_difficulty: Optional[int] = None, max_difficulty: Optional[int] = None, sort: Optional[Literal["term", "volume", "difficulty", "cpc", "added", "refreshed"]] = None, order: Optional[Literal["asc", "desc"]] = None, limit: Optional[int] = None, offset: Optional[int] = None, format_: Optional[Literal["json", "csv"]] = None) -> Any:
@@ -5455,6 +5561,21 @@ class Tools:
         never returned. Replaces any token already saved."""
         return self.call("save_baidu_token", _present({"clientId": client_id, "siteUrl": site_url, "token": token}))
 
+    def save_client_vendor_credential(self, *, client_id: str, secret: Optional[str], login: Optional[str] = None) -> Any:
+        """Connect a client's own DataForSEO account. Stores one client's own DataForSEO
+        account (the API login and API password, or leave login out and pass the Base64
+        login:password as secret), so that client pays for its own paid data: its rank
+        tracking, keyword data, SERP reads and AI visibility are bought on its account
+        instead of the agency's, and keep working while the agency's balance is empty
+        (vendor_balance_empty). Checked straight away with DataForSEO's free user_data
+        call; a failed check gives errorCode (vendor_credentials_rejected,
+        vendor_account_unverified, vendor_balance_empty) and next, and the key stays
+        saved so it can be fixed on DataForSEO's side. secret: null removes it, and the
+        client's calls go back to the agency's account. Needs client:manage on that
+        client, not agency settings, so a client's own key can do it. Answers 'we will
+        pay for our own keyword data'. The response never contains the key. Free."""
+        return self.call("save_client_vendor_credential", _present({"clientId": client_id, "login": login, "secret": secret}))
+
     def save_disavow_file(self, *, client_id: str, entries: List[Dict[str, Any]]) -> Any:
         """Build, keep and compare a disavow file. Builds a Google disavow file for the
         client from domains and URLs (as build_disavow_file does), keeps it in the
@@ -5756,7 +5877,8 @@ class Tools:
         steps, attribute and text tests, positions), regex (first group), jsonld
         ('Article.datePublished') or meta (a name or property) — see
         get_extraction_results. render runs JavaScript: off, shells (pages that look
-        unrendered, or answer like the shell other routes share) or all, capped at
+        unrendered, or answer like the shell other routes share, plus the first page of
+        each template up to 3 as a prerender parity sample) or all, capped at
         renderMaxPages. sample: {perTemplate: 50} crawls at most 50 URLs of each URL
         template (ids and numbered slugs replaced by *, from the sitemap and from
         discovered links) plus every page that belongs to no template, so a large
@@ -5764,7 +5886,10 @@ class Tools:
         turns sampling off; get_template_report then reports by template. Answers 'crawl
         this site this way'. dryRun: true shows the current settings and, when
         includePatterns or excludePatterns are given, tries each against the live
-        sitemap: patternCheck.matchNothing lists those that match no page. Free."""
+        sitemap: patternCheck.matchNothing lists those that match no page. The check
+        stops reading after 8 seconds, so a dry run answers within about 10; on a site
+        with many child sitemaps patternCheck.sampled is true and only the pages read
+        were checked. Free."""
         return self.call("set_crawl_settings", _present({"clientId": client_id, "stripParams": strip_params, "extractions": extractions, "render": render, "renderMaxPages": render_max_pages, "mode": mode, "listUrls": list_urls, "includePatterns": include_patterns, "excludePatterns": exclude_patterns, "userAgent": user_agent, "requestsPerSecond": requests_per_second, "concurrency": concurrency, "maxDepth": max_depth, "maxPages": max_pages, "sample": sample, "dryRun": dry_run}))
 
     def set_deploy_hook_sender_secret(self, *, client_id: str, sender_secret: Optional[str]) -> Any:
@@ -5865,7 +5990,7 @@ class Tools:
         carries a preview card for Slack, email and social networks. Free."""
         return self.call("set_report_sharing", _present({"clientId": client_id, "reportId": report_id, "shared": shared}))
 
-    def set_up_web_analytics(self, *, client_id: str, hostnames: Optional[List[str]] = None, exclude_paths: Optional[List[str]] = None, exclude_keeps_events: Optional[bool] = None, include_paths: Optional[List[str]] = None, path_templates: Optional[List[str]] = None, partners: Optional[List[Dict[str, Any]]] = None, respect_robots: Optional[bool] = None, currency: Optional[str] = None) -> Any:
+    def set_up_web_analytics(self, *, client_id: str, hostnames: Optional[str] = None, server_dedupe_window: Optional[str] = None, exclude_paths: Optional[List[str]] = None, exclude_keeps_events: Optional[bool] = None, include_paths: Optional[List[str]] = None, path_templates: Optional[List[str]] = None, partners: Optional[List[Dict[str, Any]]] = None, respect_robots: Optional[bool] = None, currency: Optional[str] = None, route_manifest_url: Optional[str] = None) -> Any:
         """Set up web analytics. Creates a client's cookieless web analytics, or changes
         which hostnames may report to it, and returns the same shape as
         get_web_analytics_setup: the one-line tracking snippet to add to every page, the
@@ -5876,7 +6001,7 @@ class Tools:
         hostname is ignored, so add staging or extra domains here). Safe to repeat: an
         existing setup keeps its snippet. configured is false when the client has no
         site domain to default to and no hostnames were given. Free."""
-        return self.call("set_up_web_analytics", _present({"clientId": client_id, "hostnames": hostnames, "excludePaths": exclude_paths, "excludeKeepsEvents": exclude_keeps_events, "includePaths": include_paths, "pathTemplates": path_templates, "partners": partners, "respectRobots": respect_robots, "currency": currency}))
+        return self.call("set_up_web_analytics", _present({"clientId": client_id, "hostnames": hostnames, "serverDedupeWindow": server_dedupe_window, "excludePaths": exclude_paths, "excludeKeepsEvents": exclude_keeps_events, "includePaths": include_paths, "pathTemplates": path_templates, "partners": partners, "respectRobots": respect_robots, "currency": currency, "routeManifestUrl": route_manifest_url}))
 
     def set_vendor_balance_alert(self, *, threshold_usd: Optional[float]) -> Any:
         """When to warn that the DataForSEO balance is low. Sets the agency's DataForSEO
@@ -5903,7 +6028,9 @@ class Tools:
     def start_crawl(self, *, client_id: str) -> Any:
         """Start a site audit crawl. Crawls the client's site now rather than waiting for
         the schedule. Answers 'audit the site again'. status is queued until a crawler
-        picks the crawl up (with position, 1 next in line) and running once it fetches;
+        picks the crawl up (with queuePosition, 1 next in line; etaSeconds, from the
+        median wait of the last week's crawls, null when that cannot be told; and
+        startsAfter, your own queued crawl it waits behind) and running once it fetches;
         a crawl already under way is returned instead of starting a second
         (alreadyRunning). settings and settingsVersion are the crawl settings it runs
         with. Pass the jobId it returns to wait_for_job (or poll get_crawl_status with
@@ -5948,16 +6075,15 @@ class Tools:
         quote. Can spend: pass max_cost_micros to cap it."""
         return self.call("submit_bing_urls", _present({"clientId": client_id, "urls": urls, "dryRun": dry_run, "maxCostMicros": max_cost_micros}))
 
-    def submit_indexnow(self, *, client_id: str, urls: List[str], dry_run: Optional[bool] = None, max_cost_micros: Optional[int] = None) -> Any:
+    def submit_indexnow(self, *, client_id: str, urls: List[str], dry_run: Optional[bool] = None) -> Any:
         """Tell search engines a page changed. Submits changed addresses to IndexNow, which
         Bing, Yandex, Seznam and Naver share. Google does not take part. Only accepts
         addresses on a site the agency manages — anything else is refused and named.
         Answers 'we have just republished these pages, tell the engines'. Refuses
         entirely until the client's key file has been published and checked. dryRun:
         true sends nothing and returns wouldSubmit (empty when blocked says the real
-        call would not send), refused, and the quote. Can spend: pass max_cost_micros to
-        cap it."""
-        return self.call("submit_indexnow", _present({"clientId": client_id, "urls": urls, "dryRun": dry_run, "maxCostMicros": max_cost_micros}))
+        call would not send) and refused. Free."""
+        return self.call("submit_indexnow", _present({"clientId": client_id, "urls": urls, "dryRun": dry_run}))
 
     def submit_sitemap(self, *, client_id: str, sitemap_url: str) -> Any:
         """Submit a sitemap to Google. Submits a sitemap address to the client's Google
@@ -6351,19 +6477,22 @@ class Tools:
         """Wait for a slow job. get_job that waits: holds the call open until the job's
         status changes (queued to running, or to done, failed or cancelled) or
         timeoutSeconds pass (at most 60), then answers with its status, waitedSeconds,
-        and reason: state_change or timeout. One call instead of polling; call again
-        while it says queued or running. Answers 'wait for the crawl'. Free."""
+        and reason: state_change or timeout. Takes every jobId get_job does, including
+        the call:call_req_… a 202 answer gives (clientId: any client of yours); once
+        done, result is the call's answer. One call instead of polling; call again while
+        it says queued or running. Answers 'wait for the crawl'. Free."""
         return self.call("wait_for_job", _present({"clientId": client_id, "jobId": job_id, "timeoutSeconds": timeout_seconds}))
 
     def whoami(self) -> Any:
         """Who am I connected as. Says who this connection is: the agency, whether it is an
         API key or a person, the role, every permission that role holds, the clients it
         can reach, and vendorBalanceUsable (false when the agency's DataForSEO balance
-        is empty and paid calls fail, null with no key of its own or when it cannot be
-        read), the plan in force (planLapsed says when a bought plan's subscription has
-        lapsed to trial limits; get_billing has usage), and reach: the routes a key
-        calls. Answers 'what can this key do'. Call it first when unsure whether a task
-        is allowed. Free."""
+        is empty and paid calls fail, with a vendor_balance_empty line in warnings
+        saying who can fix it; null with no key of its own or when it cannot be read),
+        the plan in force (planLapsed says when a bought plan's subscription has lapsed
+        to trial limits; get_billing has usage), and reach: the routes a key calls.
+        Answers 'what can this key do'. Call it first when unsure whether a task is
+        allowed. Free."""
         return self.call("whoami", {})
 
     def youtube_keyword_research(self, *, client_id: str, seed: str, measure: Optional[int] = None, location_code: Optional[int] = None, language_code: Optional[str] = None, max_cost_micros: Optional[int] = None, dry_run: Optional[bool] = None) -> Any:
